@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -12,7 +12,15 @@ interface BuyerSession {
   phone: string;
 }
 
-export default function BuyerLookupPage() {
+export default function BuyerLookupPageWrapper() {
+  return (
+    <Suspense fallback={<div className="public-layout"><div className="loading-page"><div className="loading-spinner" /></div></div>}>
+      <BuyerLookupPage />
+    </Suspense>
+  );
+}
+
+function BuyerLookupPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [buyer, setBuyer] = useState<BuyerSession | null>(null);
