@@ -1,0 +1,223 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Product } from '@/lib/types';
+import Link from 'next/link';
+
+export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState<Product | null>(null);
+  const [isCopy, setIsCopy] = useState(false);
+
+  useEffect(() => { loadProducts(); }, []);
+
+  async function loadProducts() {
+    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    setProducts(data || []);
+    setLoading(false);
+  }
+
+  function formatPrice(price: number) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+  }
+
+  return (
+    <div className="admin-content">
+      <div className="admin-topbar">
+        <h2>Produk</h2>
+        <button className="btn btn-primary" onClick={() => { setEditItem(null); setIsCopy(false); setShowForm(true); }}>+ Tambah Produk</button>
+      </div>
+      <div style={{ padding: '32px' }}>
+        {loading ? (
+          <div className="loading-page"><div className="loading-spinner" /></div>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Nama</th>
+                  <th>Platform</th>
+                  <th>Tipe</th>
+                  <th>Harga</th>
+                  <th>Durasi</th>
+                  <th>Max Slot</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ fontFamily: 'monospace', color: 'var(--brand-primary-light)' }}>{p.code}</td>
+                    <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{p.name}</td>
+                    <td>{p.platform_name}</td>
+                    <td>
+                      <span className={`badge ${p.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
+                        {p.account_type}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--brand-success)' }}>{formatPrice(p.price)}</td>
+                    <td>{p.duration_days} hari</td>
+                    <td>{p.default_max_slot}</td>
+                    <td>
+                      <span className={`badge ${p.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => { setEditItem(p); setIsCopy(false); setShowForm(true); }}>Edit</button>
+                        <button className="btn btn-info btn-sm" onClick={() => { setEditItem(p); setIsCopy(true); setShowForm(true); }}>Copy</button>
+                        <button 
+                          className="btn btn-danger btn-sm"
+                          onClick={async () => {
+                            if (confirm('Nonaktifkan produk ini?')) {
+                              await supabase.from('products').update({ status: p.status === 'active' ? 'inactive' : 'active', updated_at: new Date().toISOString() }).eq('id', p.id);
+                              loadProducts();
+                            }
+                          }}
+                        >
+                          {p.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {products.length === 0 && (
+                  <tr><td colSpan={9} className="empty-state"><div className="icon">📦</div><h3>Belum ada produk</h3></td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {showForm && (
+        <ProductForm
+          product={editItem}
+          isCopy={isCopy}
+          onClose={() => setShowForm(false)}
+          onSave={() => { setShowForm(false); loadProducts(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductForm({ product, isCopy, onClose, onSave }: { product: Product | null; isCopy?: boolean; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({
+    code: product?.code ? (isCopy ? product.code + '-COPY' : product.code) : '',
+    name: product?.name || '',
+    platform_name: product?.platform_name || '',
+    account_type: product?.account_type || 'sharing',
+    price: product?.price?.toString() || '',
+    duration_days: product?.duration_days?.toString() || '30',
+    default_max_slot: product?.default_max_slot?.toString() || '4',
+    description: product?.description || '',
+    status: product?.status || 'active',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+
+    const payload = {
+      code: form.code,
+      name: form.name,
+      platform_name: form.platform_name,
+      account_type: form.account_type,
+      price: parseFloat(form.price),
+      duration_days: parseInt(form.duration_days),
+      default_max_slot: form.account_type === 'private' ? 1 : parseInt(form.default_max_slot),
+      description: form.description || null,
+      status: form.status,
+      updated_at: new Date().toISOString(),
+    };
+
+    let result;
+    if (product && !isCopy) {
+      result = await supabase.from('products').update(payload).eq('id', product.id);
+    } else {
+      result = await supabase.from('products').insert({ ...payload, created_at: new Date().toISOString() });
+    }
+
+    if (result.error) {
+      setError(result.error.message);
+      setSaving(false);
+      return;
+    }
+    onSave();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3 className="modal-title">{product ? (isCopy ? 'Copy / Duplikat Produk' : 'Edit Produk') : 'Tambah Produk Baru'}</h3>
+        {error && <div className="login-error">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Kode Produk</label>
+              <input className="form-input" value={form.code} onChange={e => setForm({...form, code: e.target.value})} placeholder="NETFLIX-SHARING-30D" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Platform</label>
+              <input className="form-input" value={form.platform_name} onChange={e => setForm({...form, platform_name: e.target.value})} placeholder="Netflix" required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Nama Produk</label>
+            <input className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Netflix Premium Sharing 30 Hari" required />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Tipe Akun</label>
+              <select className="form-select" value={form.account_type} onChange={e => setForm({...form, account_type: e.target.value as 'sharing' | 'private'})}>
+                <option value="sharing">Sharing</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Max Slot</label>
+              <input type="number" className="form-input" value={form.account_type === 'private' ? '1' : form.default_max_slot} onChange={e => setForm({...form, default_max_slot: e.target.value})} disabled={form.account_type === 'private'} required />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Harga (IDR)</label>
+              <input type="number" className="form-input" value={form.price} onChange={e => setForm({...form, price: e.target.value})} placeholder="50000" required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Durasi (hari)</label>
+              <input type="number" className="form-input" value={form.duration_days} onChange={e => setForm({...form, duration_days: e.target.value})} required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Deskripsi</label>
+            <textarea className="form-textarea" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Deskripsi produk..." />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-select" value={form.status} onChange={e => setForm({...form, status: e.target.value as 'active' | 'inactive'})}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Batal</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? <span className="loading-spinner" /> : (product && !isCopy ? 'Simpan' : 'Tambah')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

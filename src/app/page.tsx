@@ -1,66 +1,111 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Product } from '@/lib/types';
+import Link from 'next/link';
+
+interface BuyerSession {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export default function HomePage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [buyer, setBuyer] = useState<BuyerSession | null>(null);
+
+  useEffect(() => {
+    loadProducts();
+    // Check buyer session
+    const session = localStorage.getItem('buyer_session');
+    if (session) {
+      setBuyer(JSON.parse(session));
+    }
+  }, []);
+
+  async function loadProducts() {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('status', 'active')
+      .order('platform_name', { ascending: true });
+    setProducts(data || []);
+    setLoading(false);
+  }
+
+  function formatPrice(price: number) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('buyer_session');
+    setBuyer(null);
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="public-layout">
+      <header className="public-header" style={{ justifyContent: 'space-between' }}>
+        <span className="brand">✦ Pasti Premium.id</span>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {buyer ? (
+            <>
+              <Link href="/buyer/lookup" className="btn btn-secondary btn-sm" style={{ backgroundColor: 'transparent', border: 'none' }}>📦 Pesanan Saya</Link>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>👤 {buyer.name}</span>
+              <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Logout</button>
+            </>
+          ) : (
+            <>
+              <Link href="/buyer/login" className="btn btn-primary btn-sm">Login / Daftar</Link>
+            </>
+          )}
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <section className="public-hero">
+        <h1>Premium Accounts<br /><span>Instant Delivery</span></h1>
+        <p>Dapatkan akun premium favorit kamu dengan harga terbaik. Akun dikirim otomatis setelah pembayaran berhasil.</p>
+      </section>
+
+      {loading ? (
+        <div className="loading-page"><div className="loading-spinner" /></div>
+      ) : products.length === 0 ? (
+        <div className="empty-state">
+          <div className="icon">📦</div>
+          <h3>Belum ada produk</h3>
+          <p>Produk akan segera tersedia. Stay tuned!</p>
         </div>
-      </main>
+      ) : (
+        <div className="products-grid">
+          {products.map(product => (
+            <div key={product.id} className="product-card">
+              <div className="platform">{product.platform_name}</div>
+              <h3>{product.name}</h3>
+              {product.description && <p className="desc">{product.description}</p>}
+              <div className="meta">
+                <span className="price">{formatPrice(product.price)}</span>
+                <span className="duration">/ {product.duration_days} hari</span>
+                <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
+                  {product.account_type}
+                </span>
+              </div>
+              <Link 
+                href={`/order/${product.id}`} 
+                className="btn btn-primary" 
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Beli Sekarang
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <footer style={{ textAlign: 'center', padding: '40px 20px', borderTop: '1px solid var(--border-secondary)', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+        <p>© 2024 Pasti Premium.id. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
