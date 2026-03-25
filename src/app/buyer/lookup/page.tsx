@@ -314,7 +314,7 @@ export default function BuyerLookupPage() {
                           <PasswordReveal encrypted={stock?.account_secret_encrypted as string} />
                         </div>
                       </div>
-                      {stock?.profile_info && (
+                      {Boolean(stock?.profile_info) && (
                         <div className="credential-field">
                           <div>
                             <div className="credential-label">Profil</div>
@@ -322,7 +322,7 @@ export default function BuyerLookupPage() {
                           </div>
                         </div>
                       )}
-                      {stock?.pin_info && (
+                      {Boolean(stock?.pin_info) && (
                         <div className="credential-field">
                           <div>
                             <div className="credential-label">PIN</div>
