@@ -2,7 +2,6 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
 export default function BuyerLoginPageWrapper() {
@@ -18,7 +17,7 @@ function BuyerLoginPage() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [form, setForm] = useState({ name: '', phone: '' });
   const [error, setError] = useState('');
 
   async function handleLogin(e: React.FormEvent) {
@@ -27,55 +26,24 @@ function BuyerLoginPage() {
     setError('');
 
     try {
-      // Find existing buyer by email
-      let { data: existing } = await supabase
-        .from('buyers')
-        .select('*')
-        .eq('email', form.email.trim().toLowerCase())
-        .single();
+      const res = await fetch('/api/buyer/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: form.name.trim(), phone: form.phone.trim() }),
+      });
+      const data = await res.json();
 
-      if (existing) {
-        // Update name & phone if changed
-        if (existing.name !== form.name.trim() || existing.phone !== form.phone.trim()) {
-          await supabase.from('buyers').update({
-            name: form.name.trim(),
-            phone: form.phone.trim(),
-            updated_at: new Date().toISOString(),
-          }).eq('id', existing.id);
-          existing.name = form.name.trim();
-          existing.phone = form.phone.trim();
-        }
-      } else {
-        // Create new buyer
-        const now = new Date().toISOString();
-        const { data: newBuyer, error: createErr } = await supabase
-          .from('buyers')
-          .insert({
-            name: form.name.trim(),
-            email: form.email.trim().toLowerCase(),
-            phone: form.phone.trim(),
-            status: 'active',
-            created_at: now,
-            updated_at: now,
-          })
-          .select()
-          .single();
-
-        if (createErr) {
-          setError('Gagal membuat akun buyer: ' + createErr.message);
-          setLoading(false);
-          return;
-        }
-        existing = newBuyer;
+      if (!res.ok) {
+        setError(data.error || 'Login gagal');
+        setLoading(false);
+        return;
       }
 
-      // Save session to localStorage
-      localStorage.setItem('buyer_session', JSON.stringify({
-        id: existing.id,
-        name: existing.name,
-        email: existing.email,
-        phone: existing.phone,
-      }));
+      // Store JWT token + buyer session
+      if (data.token) {
+        localStorage.setItem('buyer_token', data.token);
+      }
+      localStorage.setItem('buyer_session', JSON.stringify(data.buyer));
 
       // Redirect
       router.push(redirect);
@@ -114,17 +82,7 @@ function BuyerLoginPage() {
                 required
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input
-                type="email"
-                className="form-input"
-                value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="john@example.com"
-                required
-              />
-            </div>
+
             <div className="form-group">
               <label className="form-label">No. WhatsApp</label>
               <input

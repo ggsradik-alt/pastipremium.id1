@@ -13,13 +13,13 @@ interface BuyerSession {
   phone: string;
 }
 
-// === KONFIGURASI REKENING ===
-// Ganti dengan rekening asli Anda
-const BANK_ACCOUNTS = [
-  { bank: 'BCA', number: '1234567890', name: 'PASTI PREMIUM ID' },
-  { bank: 'BRI', number: '0987654321', name: 'PASTI PREMIUM ID' },
-  { bank: 'Dana', number: '08123456789', name: 'PASTI PREMIUM ID' },
-];
+interface PaymentMethod {
+  id: string;
+  provider: string;
+  account_name: string;
+  account_number: string;
+  description: string;
+}
 
 export default function OrderPage() {
   const params = useParams();
@@ -35,6 +35,7 @@ export default function OrderPage() {
   const [uploadDone, setUploadDone] = useState(false);
   const [error, setError] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     const session = localStorage.getItem('buyer_session');
@@ -46,7 +47,10 @@ export default function OrderPage() {
 
     async function load() {
       const { data } = await supabase.from('products').select('*').eq('id', params.productId).eq('status', 'active').single();
+      const { data: methods } = await supabase.from('payment_methods').select('*').eq('is_active', true);
+      
       setProduct(data);
+      if (methods) setPaymentMethods(methods);
       setLoading(false);
     }
     load();
@@ -59,6 +63,7 @@ export default function OrderPage() {
     setError('');
 
     try {
+      const refCode = localStorage.getItem('ref_code') || '';
       const res = await fetch('/api/public/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,6 +72,7 @@ export default function OrderPage() {
           buyer_email: buyer.email,
           buyer_phone: buyer.phone,
           product_id: product!.id,
+          ref_code: refCode,
         }),
       });
       const data = await res.json();
@@ -212,36 +218,41 @@ export default function OrderPage() {
                   💰 Transfer ke Salah Satu Rekening
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {BANK_ACCOUNTS.map((acc, i) => (
-                    <div key={i} style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-secondary)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '14px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '2px' }}>
-                          {acc.bank}
+                  {paymentMethods.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)' }}>Belum ada metode pembayaran tersedia</div>
+                  ) : (
+                    paymentMethods.map((acc, i) => (
+                      <div key={i} style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-secondary)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '2px' }}>
+                            {acc.provider}
+                          </div>
+                          <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-primary)', letterSpacing: '1px' }}>
+                            {acc.account_number}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            a.n. {acc.account_name} {acc.description ? `(${acc.description})` : ''}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-primary)', letterSpacing: '1px' }}>
-                          {acc.number}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          a.n. {acc.name}
-                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => copyToClipboard(acc.account_number, i)}
+                          style={{ minWidth: '72px', justifyContent: 'center' }}
+                        >
+                          {copiedIndex === i ? '✅ Copied' : '📋 Copy'}
+                        </button>
                       </div>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => copyToClipboard(acc.number, i)}
-                        style={{ minWidth: '72px', justifyContent: 'center' }}
-                      >
-                        {copiedIndex === i ? '✅ Copied' : '📋 Copy'}
-                      </button>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 

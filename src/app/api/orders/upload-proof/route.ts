@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendTelegramNotification } from '@/lib/telegram';
 
 export async function POST(request: NextRequest) {
   try {
@@ -72,6 +73,15 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', order.id);
+
+    // Send Telegram Notification
+    sendTelegramNotification(
+      `🔔 <b>BUKTI TRANSFER DIUPLOAD!</b>\n\n` +
+      `<b>Order:</b> <code>${orderNumber}</code>\n` +
+      `<b>Nominal:</b> Rp ${order.total_amount?.toLocaleString('id-ID')}\n\n` +
+      `<a href="${publicUrl}">📸 Lihat Foto Bukti</a>\n\n` +
+      `Silakan cek <b>PastiPremium.id Admin</b> untuk menyetujui dan membagikan akun secara otomatis.`
+    );
 
     return NextResponse.json({
       success: true,

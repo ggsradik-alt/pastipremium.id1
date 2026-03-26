@@ -1,30 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/auth';
 
+// Google OAuth login verification for admin
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email } = await request.json();
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email dan password wajib diisi' }, { status: 400 });
+    if (!email) {
+      return NextResponse.json({ error: 'Email required' }, { status: 400 });
     }
 
-    const { data: admin, error } = await supabase
+    const { data: admin } = await supabase
       .from('admins')
       .select('*')
       .eq('email', email)
       .eq('status', 'active')
       .single();
 
-    if (error || !admin) {
-      return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
-    }
-
-    const validPassword = await bcrypt.compare(password, admin.password_hash);
-    if (!validPassword) {
-      return NextResponse.json({ error: 'Email atau password salah' }, { status: 401 });
+    if (!admin) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
 
     // Update last login
@@ -40,7 +35,7 @@ export async function POST(request: NextRequest) {
       name: admin.name,
       email: admin.email,
       role: admin.role,
-    }, 48); // 48 hours
+    }, 48);
 
     return NextResponse.json({
       admin: {

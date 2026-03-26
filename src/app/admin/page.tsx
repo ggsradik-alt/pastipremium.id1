@@ -34,8 +34,34 @@ interface SalesData {
 export default function AdminDashboardPage() {
   const [data, setData] = useState<SalesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expiringLoading, setExpiringLoading] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  async function handleAutoExpire() {
+    setExpiringLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token') || '';
+      const res = await fetch('/api/admin/auto-expire', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (result.success) {
+        if (result.expired_count > 0) {
+          alert(`✅ Auto-Expire selesai!\n\n${result.expired_count} assignment di-expire\n${result.updated_slots} slot dibebaskan`);
+          loadDashboard();
+        } else {
+          alert('✅ Tidak ada assignment yang perlu di-expire saat ini.');
+        }
+      } else {
+        alert('Error: ' + (result.error || 'Unknown'));
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan');
+    }
+    setExpiringLoading(false);
+  }
 
   async function loadDashboard() {
     const today = new Date();
@@ -207,9 +233,19 @@ export default function AdminDashboardPage() {
           <h2>Dashboard</h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Monitoring Penjualan — Pasti Premium.id</p>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={() => { setLoading(true); loadDashboard(); }}>
-          🔄 Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setLoading(true); loadDashboard(); }}>
+            🔄 Refresh
+          </button>
+          <button
+            className="btn btn-sm"
+            style={{ backgroundColor: '#f59e0b', color: '#000', border: 'none', fontWeight: 600 }}
+            onClick={handleAutoExpire}
+            disabled={expiringLoading}
+          >
+            {expiringLoading ? <span className="loading-spinner" style={{ width: '14px', height: '14px' }} /> : '⏰ Run Auto-Expire'}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>

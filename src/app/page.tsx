@@ -24,6 +24,13 @@ export default function HomePage() {
     if (session) {
       setBuyer(JSON.parse(session));
     }
+
+    // Capture referral code from URL (?ref=CODE)
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      localStorage.setItem('ref_code', ref.toUpperCase());
+    }
   }, []);
 
   async function loadProducts() {

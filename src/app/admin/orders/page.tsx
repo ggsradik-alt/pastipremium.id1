@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Order } from '@/lib/types';
+
+const ITEMS_PER_PAGE = 15;
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -11,6 +13,11 @@ export default function OrdersPage() {
   const [assigning, setAssigning] = useState(false);
   const [proofModal, setProofModal] = useState<Order | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Feature 4: Search & Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => { loadOrders(); }, []);
 
@@ -40,7 +47,7 @@ export default function OrdersPage() {
 
     await loadOrders();
 
-    const buyer = order.buyer as any;
+    const buyer = order.buyer as unknown as { phone?: string };
     if (buyer?.phone) {
       await sendWA(order);
     } else {
@@ -52,8 +59,8 @@ export default function OrdersPage() {
   }
 
   async function sendWA(order: Order) {
-    const buyer = order.buyer as any;
-    const product = order.product as any;
+    const buyer = order.buyer as unknown as { name: string; phone: string };
+    const product = order.product as unknown as { name: string; duration_days: number };
 
     try {
       const { data: assignment, error: assignErr } = await supabase
@@ -155,9 +162,55 @@ export default function OrdersPage() {
     return map[status] || 'badge-neutral';
   }
 
-  const filteredOrders = filterStatus === 'all' 
-    ? orders 
-    : orders.filter(o => o.payment_status === filterStatus || o.order_status === filterStatus);
+  // Feature 4: Enhanced filtering with search
+  const filteredOrders = useMemo(() => {
+    let result = [...orders];
+
+    // Status filter
+    if (filterStatus === 'all') {
+      result = result.filter(o => o.payment_status !== 'pending_payment');
+    } else {
+      result = result.filter(o => o.payment_status === filterStatus || o.order_status === filterStatus);
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(o =>
+        o.order_number.toLowerCase().includes(q) ||
+        (o.buyer as unknown as { name: string })?.name?.toLowerCase().includes(q) ||
+        (o.buyer as unknown as { phone: string })?.phone?.toLowerCase().includes(q) ||
+        (o.product as unknown as { name: string })?.name?.toLowerCase().includes(q)
+      );
+    }
+
+    // Date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      let cutoff = new Date();
+      if (dateFilter === 'today') {
+        cutoff.setHours(0, 0, 0, 0);
+      } else if (dateFilter === '7days') {
+        cutoff.setDate(now.getDate() - 7);
+      } else if (dateFilter === '30days') {
+        cutoff.setDate(now.getDate() - 30);
+      }
+      result = result.filter(o => new Date(o.created_at) >= cutoff);
+    }
+
+    return result;
+  }, [orders, filterStatus, searchQuery, dateFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ITEMS_PER_PAGE));
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchQuery, dateFilter]);
 
   const waitingCount = orders.filter(o => o.payment_status === 'waiting_confirmation').length;
 
@@ -183,10 +236,45 @@ export default function OrdersPage() {
         )}
       </div>
       <div style={{ padding: '32px' }}>
+        {/* Search & Date Filter */}
+        <div style={{
+          background: 'var(--bg-card)', border: '1px solid var(--border-secondary)',
+          borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px',
+        }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '1 1 280px' }}>
+              <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                🔍 Cari Pesanan
+              </label>
+              <input
+                className="form-input"
+                placeholder="Cari order number, nama buyer, produk, no. WA..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ height: '36px', fontSize: '0.85rem' }}
+              />
+            </div>
+            <div style={{ flex: '0 0 160px' }}>
+              <label style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                Periode
+              </label>
+              <select className="form-select" value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={{ height: '36px', fontSize: '0.85rem' }}>
+                <option value="all">Semua Waktu</option>
+                <option value="today">Hari Ini</option>
+                <option value="7days">7 Hari Terakhir</option>
+                <option value="30days">30 Hari Terakhir</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Menampilkan {paginatedOrders.length} dari {filteredOrders.length} pesanan
+          </div>
+        </div>
+
         {/* Filter tabs */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {[
-            { key: 'all', label: 'Semua', count: orders.length },
+            { key: 'all', label: 'Semua', count: orders.filter(o => o.payment_status !== 'pending_payment').length },
             { key: 'waiting_confirmation', label: '⏳ Perlu Verifikasi', count: waitingCount },
             { key: 'pending_payment', label: 'Belum Bayar', count: orders.filter(o => o.payment_status === 'pending_payment').length },
             { key: 'paid', label: 'Sudah Bayar', count: orders.filter(o => o.payment_status === 'paid').length },
@@ -206,70 +294,135 @@ export default function OrdersPage() {
         {loading ? (
           <div className="loading-page"><div className="loading-spinner" /></div>
         ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Order #</th>
-                  <th>Buyer</th>
-                  <th>Produk</th>
-                  <th>Total</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th>Tanggal</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map(o => (
-                  <tr key={o.id} style={{
-                    background: o.payment_status === 'waiting_confirmation' ? 'rgba(234,179,8,0.04)' : undefined,
-                  }}>
-                    <td style={{ fontFamily: 'monospace', color: 'var(--brand-primary-light)' }}>{o.order_number}</td>
-                    <td style={{ color: 'var(--text-primary)' }}>{(o.buyer as unknown as { name: string })?.name || '-'}</td>
-                    <td>{(o.product as unknown as { name: string })?.name || '-'}</td>
-                    <td style={{ color: 'var(--brand-success)' }}>{formatPrice(o.total_amount)}</td>
-                    <td><span className={`badge ${getStatusBadge(o.payment_status)}`}>{o.payment_status === 'waiting_confirmation' ? '⏳ Menunggu' : o.payment_status}</span></td>
-                    <td><span className={`badge ${getStatusBadge(o.order_status)}`}>{o.order_status}</span></td>
-                    <td style={{ fontSize: '0.8rem' }}>{new Date(o.created_at).toLocaleString('id-ID')}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setSelectedOrder(o)}>Detail</button>
-                        
-                        {/* Show "Cek Bukti" for waiting_confirmation */}
-                        {o.payment_status === 'waiting_confirmation' && (
-                          <button
-                            className="btn btn-sm"
-                            style={{ backgroundColor: '#eab308', color: '#000', border: 'none', fontWeight: 700 }}
-                            onClick={() => setProofModal(o)}
-                          >
-                            🔍 Cek Bukti
-                          </button>
-                        )}
-
-                        {o.payment_status === 'pending_payment' && (
-                          <button className="btn btn-success btn-sm" onClick={() => handleApprovePayment(o)}>✅ Konfirmasi</button>
-                        )}
-                        {o.payment_status === 'paid' && o.order_status === 'paid' && (
-                          <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }} onClick={() => handleManualAssign(o)} disabled={assigning}>
-                            {assigning ? <span className="loading-spinner" style={{ width: '14px', height: '14px' }} /> : '📞 Assign & Kirim WA'}
-                          </button>
-                        )}
-                        {(o.order_status === 'assigned' || o.order_status === 'delivered') && (
-                          <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }} onClick={() => sendWA(o)}>
-                            📞 Kirim Ulang WA
-                          </button>
-                        )}
-                      </div>
-                    </td>
+          <>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Buyer</th>
+                    <th>Produk</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Tanggal</th>
+                    <th>Aksi</th>
                   </tr>
-                ))}
-                {filteredOrders.length === 0 && (
-                  <tr><td colSpan={8} className="empty-state"><div className="icon">🛒</div><h3>Tidak ada pesanan</h3></td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedOrders.map(o => (
+                    <tr key={o.id} style={{
+                      background: o.payment_status === 'waiting_confirmation' ? 'rgba(234,179,8,0.04)' : undefined,
+                    }}>
+                      <td style={{ fontFamily: 'monospace', color: 'var(--brand-primary-light)' }}>{o.order_number}</td>
+                      <td style={{ color: 'var(--text-primary)' }}>{(o.buyer as unknown as { name: string })?.name || '-'}</td>
+                      <td>{(o.product as unknown as { name: string })?.name || '-'}</td>
+                      <td style={{ color: 'var(--brand-success)' }}>{formatPrice(o.total_amount)}</td>
+                      <td><span className={`badge ${getStatusBadge(o.payment_status)}`}>{o.payment_status === 'waiting_confirmation' ? '⏳ Menunggu' : o.payment_status}</span></td>
+                      <td><span className={`badge ${getStatusBadge(o.order_status)}`}>{o.order_status}</span></td>
+                      <td style={{ fontSize: '0.8rem' }}>{new Date(o.created_at).toLocaleString('id-ID')}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setSelectedOrder(o)}>Detail</button>
+                          
+                          {o.payment_status === 'waiting_confirmation' && (
+                            <button
+                              className="btn btn-sm"
+                              style={{ backgroundColor: '#eab308', color: '#000', border: 'none', fontWeight: 700 }}
+                              onClick={() => setProofModal(o)}
+                            >
+                              🔍 Cek Bukti
+                            </button>
+                          )}
+
+                          {o.payment_status === 'pending_payment' && (
+                            <button className="btn btn-success btn-sm" onClick={() => handleApprovePayment(o)}>✅ Konfirmasi</button>
+                          )}
+                          {o.payment_status === 'paid' && o.order_status === 'paid' && (
+                            <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }} onClick={() => handleManualAssign(o)} disabled={assigning}>
+                              {assigning ? <span className="loading-spinner" style={{ width: '14px', height: '14px' }} /> : '📞 Assign & Kirim WA'}
+                            </button>
+                          )}
+                          {(o.order_status === 'assigned' || o.order_status === 'delivered') && (
+                            <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: '#fff', border: 'none', fontWeight: 600 }} onClick={() => sendWA(o)}>
+                              📞 Kirim Ulang WA
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {paginatedOrders.length === 0 && (
+                    <tr><td colSpan={8} className="empty-state"><div className="icon">🛒</div><h3>{searchQuery ? 'Tidak ada hasil pencarian' : 'Tidak ada pesanan'}</h3></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex', justifyContent: 'center', alignItems: 'center',
+                gap: '8px', marginTop: '20px', flexWrap: 'wrap',
+              }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  «
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  ‹ Prev
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 2) return true;
+                    return false;
+                  })
+                  .map((page, idx, arr) => {
+                    const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                    return (
+                      <span key={page}>
+                        {showEllipsis && <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>…</span>}
+                        <button
+                          className={`btn btn-sm ${currentPage === page ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setCurrentPage(page)}
+                          style={{ fontSize: '0.8rem', minWidth: '36px' }}
+                        >
+                          {page}
+                        </button>
+                      </span>
+                    );
+                  })}
+
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  Next ›
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  style={{ fontSize: '0.8rem' }}
+                >
+                  »
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -288,12 +441,11 @@ export default function OrdersPage() {
               {selectedOrder.paid_at && <div><span className="form-label">Paid At:</span> {new Date(selectedOrder.paid_at).toLocaleString('id-ID')}</div>}
               {selectedOrder.delivered_at && <div><span className="form-label">Delivered At:</span> {new Date(selectedOrder.delivered_at).toLocaleString('id-ID')}</div>}
               
-              {/* Show proof in detail modal if exists */}
-              {(selectedOrder as any).payment_proof_url && (
+              {(selectedOrder as unknown as { payment_proof_url?: string }).payment_proof_url && (
                 <div>
                   <span className="form-label">Bukti Transfer:</span>
                   <img
-                    src={(selectedOrder as any).payment_proof_url}
+                    src={(selectedOrder as unknown as { payment_proof_url: string }).payment_proof_url}
                     alt="Bukti Transfer"
                     style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: 'var(--radius-md)', marginTop: '8px', border: '1px solid var(--border-secondary)' }}
                   />
@@ -313,7 +465,6 @@ export default function OrdersPage() {
               🔍 Verifikasi Pembayaran
             </h3>
             
-            {/* Order Info */}
             <div style={{
               background: 'var(--bg-secondary)',
               borderRadius: 'var(--radius-md)',
@@ -337,25 +488,20 @@ export default function OrdersPage() {
               </div>
             </div>
             
-            {/* Proof Image */}
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 📸 Bukti Transfer
               </div>
-              {(proofModal as any).payment_proof_url ? (
+              {(proofModal as unknown as { payment_proof_url?: string }).payment_proof_url ? (
                 <img
-                  src={(proofModal as any).payment_proof_url}
+                  src={(proofModal as unknown as { payment_proof_url: string }).payment_proof_url}
                   alt="Bukti Transfer"
                   style={{
-                    width: '100%',
-                    maxHeight: '400px',
-                    objectFit: 'contain',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-secondary)',
-                    background: '#000',
-                    cursor: 'pointer',
+                    width: '100%', maxHeight: '400px', objectFit: 'contain',
+                    borderRadius: 'var(--radius-md)', border: '1px solid var(--border-secondary)',
+                    background: '#000', cursor: 'pointer',
                   }}
-                  onClick={() => window.open((proofModal as any).payment_proof_url, '_blank')}
+                  onClick={() => window.open((proofModal as unknown as { payment_proof_url: string }).payment_proof_url, '_blank')}
                 />
               ) : (
                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
@@ -364,7 +510,6 @@ export default function OrdersPage() {
               )}
             </div>
 
-            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 className="btn btn-primary"

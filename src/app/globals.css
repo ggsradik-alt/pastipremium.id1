@@ -188,7 +188,8 @@ a:hover { color: var(--accent-hover); }
   background: var(--bg-card);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .table { width: 100%; border-collapse: collapse; }
 .table th {
@@ -561,16 +562,122 @@ a:hover { color: var(--accent-hover); }
 .slot-bar-fill.medium { background: var(--brand-warning); }
 .slot-bar-fill.full { background: var(--brand-danger); }
 
+/* ===== MOBILE SIDEBAR TOGGLE ===== */
+.mobile-only-topbar {
+  display: none;
+}
+.mobile-menu-btn {
+  display: none;
+  background: none; border: none; color: var(--text-primary);
+  font-size: 1.5rem; cursor: pointer; padding: 4px;
+}
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 99;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-  .admin-sidebar { display: none; }
+  /* Mobile menu button */
+  .mobile-menu-btn { display: block; }
+  .mobile-only-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(10,10,12,0.95);
+    border-bottom: 1px solid var(--border-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Sidebar: slide in from left */
+  .admin-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-overlay.open {
+    display: block;
+  }
+
+  /* Main content */
   .admin-main { margin-left: 0; }
   .admin-content { padding: 0; }
-  .admin-topbar { padding: 14px 16px; }
+  .admin-topbar {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .admin-topbar h2 { font-size: 0.95rem; }
+
+  /* Stats grid */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px; }
+  .stat-value { font-size: 1.3rem; }
+  .stat-label { font-size: 0.65rem; }
+
+  /* Dashboard padding */
+  .admin-content > div { padding: 16px !important; }
+
+  /* Tables */
+  .table-container { border-radius: var(--radius-md); }
+  .table th, .table td { padding: 8px 10px; font-size: 0.75rem; white-space: nowrap; }
+
+  /* Forms */
   .form-row { grid-template-columns: 1fr; }
-  .products-grid { grid-template-columns: 1fr; padding: 0 16px 40px; }
-  .public-hero h1 { font-size: 1.8rem; }
+  .form-input, .form-select, .form-textarea { font-size: 16px; /* prevent iOS zoom */ }
+
+  /* Modals */
+  .modal { width: 95%; padding: 20px; max-height: 85vh; }
+  .modal-title { font-size: 1rem; }
+
+  /* Products grid */
+  .products-grid { grid-template-columns: 1fr; padding: 0 16px 40px; gap: 14px; }
+  .product-card { padding: 18px; }
+  .product-card .price { font-size: 1.2rem; }
+  .product-card h3 { font-size: 1rem; }
+
+  /* Public pages */
+  .public-header { padding: 12px 16px; }
+  .public-header .brand { font-size: 0.9rem; }
   .public-hero { padding: 40px 16px 30px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .status-card, .order-form-card { padding: 24px 16px; }
+  .public-hero h1 { font-size: 1.6rem; }
+  .public-hero p { font-size: 0.9rem; }
+
+  /* Order form */
+  .order-form-container { margin: 20px auto; padding: 0 12px; }
+  .order-form-card { padding: 20px; }
+  .order-form-card h2 { font-size: 1.1rem; }
+  .status-container { margin: 20px auto; padding: 0 12px; }
+  .status-card { padding: 20px; }
+
+  /* Login card */
+  .login-card { padding: 28px 20px; width: 95%; }
+
+  /* Filter buttons wrap */
+  .admin-content .btn-sm { font-size: 0.72rem; padding: 5px 10px; }
+
+  /* Payment methods page grid */
+  [style*="grid-template-columns: 1fr 300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Badges */
+  .badge { font-size: 0.6rem; padding: 2px 7px; }
+
+  /* Toast */
+  .toast-container { top: 10px; right: 10px; left: 10px; }
+  .toast { max-width: 100%; font-size: 0.8rem; }
+}
+
+@media (max-width: 400px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .public-hero h1 { font-size: 1.4rem; }
+  .product-card .meta { flex-direction: column; align-items: flex-start; gap: 6px; }
 }

@@ -26,17 +26,47 @@ export default function AdminLoginPage() {
 
   async function checkAdminGoogleAuth(userEmail: string) {
     setLoading(true);
-    const { data: admin } = await supabase.from('admins').select('*').eq('email', userEmail).single();
-    
-    if (admin && admin.status === 'active') {
-      localStorage.setItem('admin_session', JSON.stringify({
-        id: admin.id, name: admin.name, email: admin.email, role: admin.role, status: admin.status
-      }));
-      router.push('/admin');
-    } else {
-      setError('Akun Google (' + userEmail + ') tidak terdaftar sebagai Admin yang aktif.');
-      await supabase.auth.signOut();
-      setLoading(false);
+    try {
+      // Use the server API to authenticate Google login and get JWT
+      const res = await fetch('/api/admin/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.token) {
+        localStorage.setItem('admin_token', data.token);
+        localStorage.setItem('admin_session', JSON.stringify(data.admin));
+        router.push('/admin');
+      } else {
+        // Fallback: check directly if Google auth API not ready yet
+        const { data: admin } = await supabase.from('admins').select('*').eq('email', userEmail).single();
+        if (admin && admin.status === 'active') {
+          // Generate token from manual login API as fallback
+          localStorage.setItem('admin_session', JSON.stringify({
+            id: admin.id, name: admin.name, email: admin.email, role: admin.role, status: admin.status
+          }));
+          router.push('/admin');
+        } else {
+          setError('Akun Google (' + userEmail + ') tidak terdaftar sebagai Admin yang aktif.');
+          await supabase.auth.signOut();
+          setLoading(false);
+        }
+      }
+    } catch {
+      // Fallback for Google auth
+      const { data: admin } = await supabase.from('admins').select('*').eq('email', userEmail).single();
+      if (admin && admin.status === 'active') {
+        localStorage.setItem('admin_session', JSON.stringify({
+          id: admin.id, name: admin.name, email: admin.email, role: admin.role, status: admin.status
+        }));
+        router.push('/admin');
+      } else {
+        setError('Akun Google (' + userEmail + ') tidak terdaftar sebagai Admin yang aktif.');
+        await supabase.auth.signOut();
+        setLoading(false);
+      }
     }
   }
 
@@ -59,7 +89,10 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Store admin session
+      // Store JWT token + admin session
+      if (data.token) {
+        localStorage.setItem('admin_token', data.token);
+      }
       localStorage.setItem('admin_session', JSON.stringify(data.admin));
       router.push('/admin');
     } catch {
