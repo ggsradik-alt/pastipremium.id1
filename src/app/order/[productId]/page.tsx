@@ -77,7 +77,7 @@ export default function OrderPage() {
   function handlePayWithPakasir() {
     if (!result) return;
     // Redirect to Pakasir payment page
-    const redirectUrl = `${window.location.origin}/buyer/lookup?order=${result.order_number}`;
+    const redirectUrl = `${window.location.origin}/order/success?order=${result.order_number}`;
     const pakasirUrl = `https://app.pakasir.com/pay/pastipremiumid1/${result.amount}?order_id=${result.order_number}&redirect=${encodeURIComponent(redirectUrl)}`;
     window.location.href = pakasirUrl;
   }
