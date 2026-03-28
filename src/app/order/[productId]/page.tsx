@@ -88,14 +88,9 @@ export default function OrderPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!allowed.includes(file.type)) {
-      setError('Format file harus JPG, PNG, atau WebP');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ukuran file maksimal 5MB');
+    // Validate (Bebas format gambar/PDF iOS/Android)
+    if (file.size > 15 * 1024 * 1024) {
+      setError('Ukuran file maksimal 15MB');
       return;
     }
 
@@ -293,10 +288,10 @@ export default function OrderPage() {
                   >
                     <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📷</div>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Klik untuk pilih foto</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>JPG, PNG, WebP — Maks 5MB</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Semua Format Foto / PDF — Maks 15MB</div>
                     <input
                       type="file"
-                      accept="image/jpeg,image/png,image/webp"
+                      accept="image/*,.heic,.pdf"
                       onChange={handleFileChange}
                       style={{ display: 'none' }}
                     />

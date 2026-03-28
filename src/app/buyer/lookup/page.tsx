@@ -110,9 +110,7 @@ function BuyerLookupPage() {
   function handleProofFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) { setError('Format file harus JPG, PNG, atau WebP'); return; }
-    if (file.size > 5 * 1024 * 1024) { setError('Ukuran file maksimal 5MB'); return; }
+    if (file.size > 15 * 1024 * 1024) { setError('Ukuran file maksimal 15MB'); return; }
     setProofFile(file);
     setError('');
     const reader = new FileReader();
@@ -246,8 +244,8 @@ function BuyerLookupPage() {
                   }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>📷</div>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>Klik untuk pilih foto</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>JPG, PNG, WebP — Maks 5MB</div>
-                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleProofFile} style={{ display: 'none' }} />
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Semua Format Foto / PDF — Maks 15MB</div>
+                    <input type="file" accept="image/*,.heic,.pdf" onChange={handleProofFile} style={{ display: 'none' }} />
                   </label>
                 ) : (
                   <div style={{ position: 'relative', marginBottom: '12px' }}>

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendTelegramNotification } from '@/lib/telegram';
+import { google } from 'googleapis';
+import { Readable } from 'stream';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,15 +14,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File dan nomor order wajib diisi' }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Format file harus JPG, PNG, atau WebP' }, { status: 400 });
-    }
-
-    // Max 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: 'Ukuran file maksimal 5MB' }, { status: 400 });
+    // Max 15MB
+    if (file.size > 15 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Ukuran file maksimal 15MB' }, { status: 400 });
     }
 
     // Find order
@@ -34,35 +30,73 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Order tidak ditemukan' }, { status: 404 });
     }
 
-    // Only allow upload for pending orders
-    if (order.payment_status !== 'pending_payment') {
+    // Only allow upload for pending/pending_payment orders
+    if (order.payment_status !== 'pending_payment' && order.payment_status !== 'pending') {
       return NextResponse.json({ error: 'Order sudah dibayar atau dibatalkan' }, { status: 400 });
     }
 
-    // Upload to Supabase Storage
+    // Prepare File Stream for Google Drive
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
+
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `${orderNumber}-${Date.now()}.${ext}`;
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
 
-    const { error: uploadErr } = await supabase.storage
-      .from('payment-proofs')
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: true,
+    let publicUrl = '';
+
+    // Upload to Google Drive
+    try {
+      if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+         throw new Error('Credential Google Drive belum di set di .env');
+      }
+
+      const auth = new google.auth.GoogleAuth({
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/drive.file'],
       });
 
-    if (uploadErr) {
-      console.error('Upload error:', uploadErr);
-      return NextResponse.json({ error: 'Gagal upload file: ' + uploadErr.message }, { status: 500 });
+      const drive = google.drive({ version: 'v3', auth });
+      const folderId = '1tqCQ-9N2TcF52Fb7YQWyua7xhHjN2MD9';
+
+      const response = await drive.files.create({
+        requestBody: {
+          name: fileName,
+          parents: folderId ? [folderId] : undefined,
+        },
+        media: {
+          mimeType: file.type || 'application/octet-stream',
+          body: stream,
+        },
+        fields: 'id, webViewLink, webContentLink',
+      });
+
+      const fileId = response.data.id;
+
+      if (fileId) {
+        // Set file as public so anyone with link can view (like Admin & Web)
+        await drive.permissions.create({
+          fileId: fileId,
+          requestBody: {
+            role: 'reader',
+            type: 'anyone',
+          },
+        });
+        
+        // Use webViewLink for the admin to view it directly
+        publicUrl = response.data.webViewLink || '';
+      } else {
+        throw new Error('Gagal mendapatkan file ID dari Google Drive');
+      }
+    } catch (gdriveErr: any) {
+      console.error('Google Drive Upload error:', gdriveErr);
+      return NextResponse.json({ error: 'Konfigurasi Google Drive bermasalah atau gagal upload: ' + gdriveErr.message }, { status: 500 });
     }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('payment-proofs')
-      .getPublicUrl(fileName);
-
-    const publicUrl = urlData.publicUrl;
 
     // Update order with proof URL and change payment_status to waiting_confirmation
     await supabase
@@ -76,16 +110,16 @@ export async function POST(request: NextRequest) {
 
     // Send Telegram Notification
     sendTelegramNotification(
-      `🔔 <b>BUKTI TRANSFER DIUPLOAD!</b>\n\n` +
+      `🔔 <b>BUKTI TRANSFER DIUPLOAD! (Via GDrive)</b>\n\n` +
       `<b>Order:</b> <code>${orderNumber}</code>\n` +
       `<b>Nominal:</b> Rp ${order.total_amount?.toLocaleString('id-ID')}\n\n` +
-      `<a href="${publicUrl}">📸 Lihat Foto Bukti</a>\n\n` +
-      `Silakan cek <b>PastiPremium.id Admin</b> untuk menyetujui dan membagikan akun secara otomatis.`
+      `<a href="${publicUrl}">📸 Lihat Foto Bukti (GDrive)</a>\n\n` +
+      `Silakan cek <b>PastiPremium.id Admin</b> untuk memverifikasi dan mengirimkan akun.`
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Bukti pembayaran berhasil diupload',
+      message: 'Bukti pembayaran berhasil diupload ke Google Drive',
       proof_url: publicUrl,
     });
   } catch (err) {
