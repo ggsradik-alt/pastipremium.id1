@@ -13,29 +13,22 @@ interface BuyerSession {
   phone: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  provider: string;
-  account_name: string;
-  account_number: string;
-  description: string;
-}
-
 export default function OrderPage() {
   const params = useParams();
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [buyer, setBuyer] = useState<BuyerSession | null>(null);
   const [result, setResult] = useState<{ order_number: string; amount: number } | null>(null);
+  const [error, setError] = useState('');
+
+  // Manual upload states (fallback)
+  const [showManualUpload, setShowManualUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
-  const [error, setError] = useState('');
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   useEffect(() => {
     const session = localStorage.getItem('buyer_session');
@@ -47,10 +40,7 @@ export default function OrderPage() {
 
     async function load() {
       const { data } = await supabase.from('products').select('*').eq('id', params.productId).eq('status', 'active').single();
-      const { data: methods } = await supabase.from('payment_methods').select('*').eq('is_active', true);
-      
       setProduct(data);
-      if (methods) setPaymentMethods(methods);
       setLoading(false);
     }
     load();
@@ -84,19 +74,23 @@ export default function OrderPage() {
     }
   }
 
+  function handlePayWithPakasir() {
+    if (!result) return;
+    // Redirect to Pakasir payment page
+    const redirectUrl = `${window.location.origin}/buyer/lookup?order=${result.order_number}`;
+    const pakasirUrl = `https://app.pakasir.com/pay/pastipremiumid1/${result.amount}?order_id=${result.order_number}&redirect=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = pakasirUrl;
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate (Bebas format gambar/PDF iOS/Android)
     if (file.size > 15 * 1024 * 1024) {
       setError('Ukuran file maksimal 15MB');
       return;
     }
-
     setProofFile(file);
     setError('');
-    // Preview
     const reader = new FileReader();
     reader.onload = () => setProofPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -106,16 +100,11 @@ export default function OrderPage() {
     if (!proofFile || !result) return;
     setUploading(true);
     setError('');
-
     try {
       const formData = new FormData();
       formData.append('file', proofFile);
       formData.append('order_number', result.order_number);
-
-      const res = await fetch('/api/orders/upload-proof', {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await fetch('/api/orders/upload-proof', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
         setUploadDone(true);
@@ -126,12 +115,6 @@ export default function OrderPage() {
       setError('Terjadi kesalahan koneksi');
     }
     setUploading(false);
-  }
-
-  function copyToClipboard(text: string, index: number) {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
   }
 
   function formatPrice(price: number) {
@@ -174,27 +157,22 @@ export default function OrderPage() {
                 <Link href="/" className="btn btn-secondary">Kembali</Link>
               </div>
             </div>
-          ) : (
-            /* ===== PAYMENT INSTRUCTION + UPLOAD ===== */
+          ) : showManualUpload ? (
+            /* ===== MANUAL UPLOAD FALLBACK ===== */
             <div className="order-form-card">
               <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>💳</div>
-                <h2 style={{ marginBottom: '8px' }}>Lakukan Pembayaran</h2>
+                <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📸</div>
+                <h2 style={{ marginBottom: '8px' }}>Upload Bukti Transfer Manual</h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  Transfer ke salah satu rekening di bawah, lalu upload bukti transfer
+                  Transfer ke rekening admin, lalu upload bukti transfer di sini
                 </p>
               </div>
 
               {/* Order Summary */}
               <div style={{
-                background: 'var(--bg-secondary)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-primary)',
-                padding: '16px',
-                marginBottom: '20px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-primary)', padding: '16px', marginBottom: '20px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '4px' }}>
@@ -207,81 +185,14 @@ export default function OrderPage() {
                 </div>
               </div>
 
-              {/* Bank Accounts */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  💰 Transfer ke Salah Satu Rekening
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {paymentMethods.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)' }}>Belum ada metode pembayaran tersedia</div>
-                  ) : (
-                    paymentMethods.map((acc, i) => (
-                      <div key={i} style={{
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-secondary)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '14px 16px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '2px' }}>
-                            {acc.provider}
-                          </div>
-                          <div style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--text-primary)', letterSpacing: '1px' }}>
-                            {acc.account_number}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            a.n. {acc.account_name} {acc.description ? `(${acc.description})` : ''}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => copyToClipboard(acc.account_number, i)}
-                          style={{ minWidth: '72px', justifyContent: 'center' }}
-                        >
-                          {copiedIndex === i ? '✅ Copied' : '📋 Copy'}
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Important Notice */}
-              <div style={{
-                background: 'rgba(234,179,8,0.08)',
-                border: '1px solid rgba(234,179,8,0.2)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px 16px',
-                marginBottom: '24px',
-                fontSize: '0.8rem',
-                color: '#eab308',
-              }}>
-                ⚠️ <strong>Penting:</strong> Transfer tepat <strong>{formatPrice(result.amount)}</strong>. Pastikan nominal sama persis agar verifikasi lebih cepat.
-              </div>
-
               {/* Upload Section */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  📸 Upload Bukti Transfer
-                </div>
-
                 {!proofPreview ? (
                   <label style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '2px dashed var(--border-primary)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '32px',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.2s, background 0.2s',
-                    background: 'var(--bg-secondary)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    border: '2px dashed var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    padding: '32px', cursor: 'pointer', background: 'var(--bg-secondary)',
+                    transition: 'border-color 0.2s',
                   }}
                   onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; }}
                   onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-primary)'; }}
@@ -289,58 +200,126 @@ export default function OrderPage() {
                     <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📷</div>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Klik untuk pilih foto</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Semua Format Foto / PDF — Maks 15MB</div>
-                    <input
-                      type="file"
-                      accept="image/*,.heic,.pdf"
-                      onChange={handleFileChange}
-                      style={{ display: 'none' }}
-                    />
+                    <input type="file" accept="image/*,.heic,.pdf" onChange={handleFileChange} style={{ display: 'none' }} />
                   </label>
                 ) : (
                   <div style={{ position: 'relative' }}>
-                    <img
-                      src={proofPreview}
-                      alt="Bukti Transfer"
-                      style={{
-                        width: '100%',
-                        maxHeight: '300px',
-                        objectFit: 'contain',
-                        borderRadius: 'var(--radius-md)',
-                        border: '1px solid var(--border-secondary)',
-                        background: 'var(--bg-card)',
-                      }}
-                    />
-                    <button
-                      onClick={() => { setProofFile(null); setProofPreview(null); }}
-                      style={{
-                        position: 'absolute', top: '8px', right: '8px',
-                        background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none',
-                        borderRadius: '50%', width: '28px', height: '28px',
-                        cursor: 'pointer', fontSize: '0.8rem', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >✕</button>
+                    <img src={proofPreview} alt="Bukti Transfer" style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-secondary)', background: 'var(--bg-card)' }} />
+                    <button onClick={() => { setProofFile(null); setProofPreview(null); }} style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
                   </div>
                 )}
               </div>
 
               {error && <div className="login-error">{error}</div>}
 
-              <button
-                className="btn btn-primary btn-lg"
-                style={{ width: '100%', justifyContent: 'center', opacity: proofFile ? 1 : 0.5 }}
-                disabled={!proofFile || uploading}
-                onClick={handleUploadProof}
-              >
+              <button className="btn btn-primary btn-lg" style={{ width: '100%', justifyContent: 'center', opacity: proofFile ? 1 : 0.5 }} disabled={!proofFile || uploading} onClick={handleUploadProof}>
                 {uploading ? <span className="loading-spinner" /> : '📤 Kirim Bukti Pembayaran'}
               </button>
 
               <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowManualUpload(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                  ← Kembali ke pembayaran otomatis
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ===== PAYMENT OPTIONS (PAKASIR + MANUAL) ===== */
+            <div className="order-form-card">
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>💳</div>
+                <h2 style={{ marginBottom: '8px' }}>Pilih Metode Pembayaran</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Pesanan berhasil dibuat! Silakan lanjutkan pembayaran
+                </p>
+              </div>
+
+              {/* Order Summary */}
+              <div style={{
+                background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-primary)', padding: '16px', marginBottom: '24px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Order #{result.order_number}
+                  </div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{product.name}</div>
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-success)' }}>
+                  {formatPrice(result.amount)}
+                </div>
+              </div>
+
+              {/* PAKASIR - Primary Payment */}
+              <div style={{ marginBottom: '16px' }}>
+                <button
+                  className="btn btn-primary btn-lg"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    padding: '18px 24px',
+                    fontSize: '1rem',
+                    background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
+                    border: 'none',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                  onClick={handlePayWithPakasir}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '1.3rem' }}>⚡</span>
+                    <span>Bayar via QRIS / Virtual Account</span>
+                  </span>
+                </button>
+                <div style={{ textAlign: 'center', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--brand-success)', fontWeight: 600 }}>✓ Otomatis</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>— Akun langsung dikirim setelah bayar</span>
+                </div>
+              </div>
+
+              {/* Supported Methods Icons */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                padding: '12px', marginBottom: '20px', flexWrap: 'wrap',
+              }}>
+                {['QRIS', 'BRI', 'BNI', 'CIMB', 'Permata', 'Maybank'].map(m => (
+                  <span key={m} style={{
+                    fontSize: '0.65rem', fontWeight: 700, background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-primary)', borderRadius: '6px',
+                    padding: '4px 8px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px',
+                  }}>{m}</span>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--border-primary)' }} />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>ATAU</span>
+                <div style={{ flex: 1, height: '1px', background: 'var(--border-primary)' }} />
+              </div>
+
+              {/* Manual Transfer Option */}
+              <button
+                className="btn btn-secondary"
+                style={{ width: '100%', justifyContent: 'center', padding: '14px' }}
+                onClick={() => setShowManualUpload(true)}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                  <span>📸</span>
+                  <span>Transfer Manual & Upload Bukti</span>
+                </span>
+              </button>
+              <div style={{ textAlign: 'center', marginTop: '6px' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Verifikasi manual oleh admin (5-15 menit)</span>
+              </div>
+
+              {/* Link to check status */}
+              <div style={{ textAlign: 'center', marginTop: '20px' }}>
                 <Link
                   href={`/buyer/lookup?order=${result.order_number}`}
                   style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'underline' }}
                 >
-                  Upload nanti? Cek status pesanan →
+                  Bayar nanti? Cek status pesanan →
                 </Link>
               </div>
             </div>
