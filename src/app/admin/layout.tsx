@@ -304,16 +304,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {/* Desktop notification bar */}
+        {/* Desktop notification bar — inline, not fixed */}
         <div style={{
-          position: 'fixed', top: '16px', right: '24px', zIndex: 100,
-          display: 'flex', alignItems: 'center', gap: '12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: '12px', padding: '8px 28px',
+          background: 'rgba(10,10,12,0.85)',
+          borderBottom: '1px solid var(--border-secondary)',
+          backdropFilter: 'blur(12px)',
+          position: 'sticky', top: 0, zIndex: 90,
         }} className="desktop-notif-bar">
           {/* Pending counts */}
           {(pendingOrdersCount > 0 || waitingVerifCount > 0) && (
-            <div style={{
-              display: 'flex', gap: '8px', alignItems: 'center',
-            }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               {waitingVerifCount > 0 && (
                 <Link href="/admin/orders" style={{
                   background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)',
@@ -333,9 +335,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={() => setShowNotifications(!showNotifications)}
               style={{
                 background: 'var(--bg-card)', border: '1px solid var(--border-secondary)',
-                borderRadius: '50%', width: '40px', height: '40px',
+                borderRadius: '50%', width: '36px', height: '36px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '1.1rem', position: 'relative',
+                cursor: 'pointer', fontSize: '1rem', position: 'relative',
                 transition: 'all 0.2s',
               }}
             >
@@ -361,7 +363,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   onClick={() => setShowNotifications(false)}
                 />
                 <div style={{
-                  position: 'absolute', top: '48px', right: 0,
+                  position: 'absolute', top: '44px', right: 0,
                   background: 'var(--bg-card)', border: '1px solid var(--border-primary)',
                   borderRadius: 'var(--radius-lg)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                   width: '360px', maxHeight: '440px', overflow: 'hidden',
