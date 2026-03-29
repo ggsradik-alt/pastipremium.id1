@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate, adminInsert, adminDelete } from '@/lib/adminApi';
 
 interface PaymentMethod {
   id: string;
@@ -39,9 +40,9 @@ export default function AdminPaymentMethodsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (editingId) {
-      await supabase.from('payment_methods').update(form).eq('id', editingId);
+      await adminUpdate('payment_methods', form, { id: editingId });
     } else {
-      await supabase.from('payment_methods').insert([form]);
+      await adminInsert('payment_methods', form);
     }
     setForm({ provider: '', account_name: '', account_number: '', description: '', is_active: true });
     setEditingId(null);
@@ -61,7 +62,7 @@ export default function AdminPaymentMethodsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Hapus metode pembayaran ini?')) return;
-    await supabase.from('payment_methods').delete().eq('id', id);
+    await adminDelete('payment_methods', { id });
     loadMethods();
   }
 

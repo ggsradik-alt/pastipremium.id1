@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminDelete, adminUpdate } from '@/lib/adminApi';
 import { StockAccount, Product } from '@/lib/types';
 
 const ITEMS_PER_PAGE = 15;
@@ -63,7 +64,8 @@ export default function StockAccountsPage() {
   async function handleDelete(id: number) {
     if (!confirm('Apakah Anda yakin ingin menghapus stok akun ini? Data yang dihapus tidak bisa dikembalikan.')) return;
     try {
-      await supabase.from('stock_accounts').delete().eq('id', id);
+      const res = await adminDelete('stock_accounts', { id });
+      if (res.error) { alert('Gagal: ' + res.error); return; }
       loadData();
     } catch {
       alert('Gagal menghapus stok akun.');
@@ -299,7 +301,7 @@ export default function StockAccountsPage() {
                             value={a.status}
                             style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto' }}
                             onChange={async (e) => {
-                              await supabase.from('stock_accounts').update({ status: e.target.value, updated_at: new Date().toISOString() }).eq('id', a.id);
+                              await adminUpdate('stock_accounts', { status: e.target.value, updated_at: new Date().toISOString() }, { id: a.id });
                               loadData();
                             }}
                           >

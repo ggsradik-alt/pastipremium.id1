@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate, adminRpc } from '@/lib/adminApi';
 import { Order } from '@/lib/types';
 
 const ITEMS_PER_PAGE = 15;
@@ -32,7 +33,7 @@ export default function OrdersPage() {
 
   async function handleManualAssign(order: Order) {
     setAssigning(true);
-    const { data, error } = await supabase.rpc('assign_account_for_order', { p_order_id: order.id });
+    const { data, error } = await adminRpc('assign_account_for_order', { p_order_id: order.id });
     
     if (error) {
       alert('Error: ' + error.message);
@@ -139,14 +140,11 @@ export default function OrdersPage() {
     const reason = prompt('Alasan penolakan pembayaran:');
     if (!reason) return;
 
-    await supabase
-      .from('orders')
-      .update({
-        payment_status: 'pending_payment',
-        payment_proof_url: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', order.id);
+    await adminUpdate('orders', {
+      payment_status: 'pending_payment',
+      payment_proof_url: null,
+      updated_at: new Date().toISOString(),
+    }, { id: order.id });
 
     alert(`Bukti pembayaran ditolak. Buyer dapat mengupload ulang.\nAlasan: ${reason}`);
     setProofModal(null);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate } from '@/lib/adminApi';
 
 export default function SupportPage() {
   const [tickets, setTickets] = useState<Array<Record<string, unknown>>>([]);
@@ -53,7 +54,7 @@ export default function SupportPage() {
                         style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto' }}
                         onChange={async (e) => {
                           const admin = JSON.parse(localStorage.getItem('admin_session') || '{}');
-                          await supabase.from('support_tickets').update({ status: e.target.value, handled_by_admin_id: admin.id, updated_at: new Date().toISOString() }).eq('id', t.id);
+                          await adminUpdate('support_tickets', { status: e.target.value, handled_by_admin_id: admin.id, updated_at: new Date().toISOString() }, { id: t.id });
                           loadTickets();
                         }}
                       >

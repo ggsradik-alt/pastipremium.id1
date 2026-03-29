@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate, adminInsert } from '@/lib/adminApi';
 import { Product } from '@/lib/types';
 import Link from 'next/link';
 
@@ -76,7 +77,7 @@ export default function ProductsPage() {
                           className="btn btn-danger btn-sm"
                           onClick={async () => {
                             if (confirm('Nonaktifkan produk ini?')) {
-                              await supabase.from('products').update({ status: p.status === 'active' ? 'inactive' : 'active', updated_at: new Date().toISOString() }).eq('id', p.id);
+                              await adminUpdate('products', { status: p.status === 'active' ? 'inactive' : 'active', updated_at: new Date().toISOString() }, { id: p.id });
                               loadProducts();
                             }
                           }}
@@ -143,9 +144,9 @@ function ProductForm({ product, isCopy, onClose, onSave }: { product: Product | 
 
     let result;
     if (product && !isCopy) {
-      result = await supabase.from('products').update(payload).eq('id', product.id);
+      result = await adminUpdate('products', payload, { id: product.id });
     } else {
-      result = await supabase.from('products').insert({ ...payload, created_at: new Date().toISOString() });
+      result = await adminInsert('products', { ...payload, created_at: new Date().toISOString() });
     }
 
     if (result.error) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate } from '@/lib/adminApi';
 
 export default function BuyersPage() {
   const [buyers, setBuyers] = useState<Array<Record<string, unknown>>>([]);
@@ -40,7 +41,7 @@ export default function BuyersPage() {
                       <button
                         className={`btn btn-sm ${(b.status as string) === 'active' ? 'btn-danger' : 'btn-success'}`}
                         onClick={async () => {
-                          await supabase.from('buyers').update({ status: (b.status as string) === 'active' ? 'blocked' : 'active', updated_at: new Date().toISOString() }).eq('id', b.id);
+                          await adminUpdate('buyers', { status: (b.status as string) === 'active' ? 'blocked' : 'active', updated_at: new Date().toISOString() }, { id: b.id });
                           loadBuyers();
                         }}
                       >

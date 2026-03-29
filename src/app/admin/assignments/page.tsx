@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminRpc } from '@/lib/adminApi';
 
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Array<Record<string, unknown>>>([]);
@@ -23,7 +24,7 @@ export default function AssignmentsPage() {
     if (!reason) return;
     
     const admin = JSON.parse(localStorage.getItem('admin_session') || '{}');
-    const { data, error } = await supabase.rpc('replace_account_assignment', {
+    const { data, error } = await adminRpc('replace_account_assignment', {
       p_old_assignment_id: assignmentId,
       p_reason: reason,
       p_admin_id: admin.id,

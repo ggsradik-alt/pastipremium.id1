@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { adminUpdate, adminInsert, adminDelete } from '@/lib/adminApi';
 
 interface Reseller {
   id: string;
@@ -74,21 +75,21 @@ export default function AdminResellersPage() {
     e.preventDefault();
 
     if (editingId) {
-      await supabase.from('resellers').update({
+      await adminUpdate('resellers', {
         name: form.name,
         phone: form.phone,
         commission_per_sale: form.commission_per_sale,
         status: form.status,
         updated_at: new Date().toISOString(),
-      }).eq('id', editingId);
+      }, { id: editingId });
     } else {
-      await supabase.from('resellers').insert([{
+      await adminInsert('resellers', {
         name: form.name,
         phone: form.phone,
         ref_code: form.ref_code.toUpperCase().replace(/[^A-Z0-9]/g, ''),
         commission_per_sale: form.commission_per_sale,
         status: form.status,
-      }]);
+      });
     }
 
     setForm({ name: '', phone: '', ref_code: '', commission_per_sale: 3000, status: 'active' });
@@ -111,22 +112,19 @@ export default function AdminResellersPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Hapus reseller ini? Semua data komisinya juga akan terhapus.')) return;
-    await supabase.from('resellers').delete().eq('id', id);
+    await adminDelete('resellers', { id });
     loadResellers();
   }
 
   async function handlePayAll(reseller: Reseller) {
     if (!confirm(`Tandai semua komisi ${reseller.name} (${formatPrice(reseller.unpaid_commission)}) sebagai SUDAH DIBAYAR?`)) return;
 
-    await supabase.from('reseller_commissions')
-      .update({ status: 'paid', paid_at: new Date().toISOString() })
-      .eq('reseller_id', reseller.id)
-      .eq('status', 'unpaid');
+    await adminUpdate('reseller_commissions', { status: 'paid', paid_at: new Date().toISOString() }, { reseller_id: reseller.id });
 
-    await supabase.from('resellers').update({
+    await adminUpdate('resellers', {
       unpaid_commission: 0,
       updated_at: new Date().toISOString(),
-    }).eq('id', reseller.id);
+    }, { id: reseller.id });
 
     loadResellers();
     if (selectedReseller?.id === reseller.id) loadCommissions(reseller.id);
