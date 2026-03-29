@@ -3,14 +3,7 @@
 
 function getAdminToken(): string {
   if (typeof window === 'undefined') return '';
-  const session = localStorage.getItem('admin_session');
-  if (!session) return '';
-  try {
-    const parsed = JSON.parse(session);
-    return parsed.token || '';
-  } catch {
-    return '';
-  }
+  return localStorage.getItem('admin_token') || '';
 }
 
 async function adminFetch(body: Record<string, unknown>) {
