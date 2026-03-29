@@ -24,14 +24,14 @@ export default function AssignmentsPage() {
     if (!reason) return;
     
     const admin = JSON.parse(localStorage.getItem('admin_session') || '{}');
-    const { data, error } = await adminRpc('replace_account_assignment', {
+    const result = await adminRpc('replace_account_assignment', {
       p_old_assignment_id: assignmentId,
       p_reason: reason,
       p_admin_id: admin.id,
     });
 
-    if (error) { alert('Error: ' + error.message); return; }
-    if (data && !data.success) { alert('Gagal: ' + data.error); return; }
+    if (result.error) { alert('Error: ' + result.error); return; }
+    if (result.data && !result.data.success) { alert('Gagal: ' + result.data.error); return; }
     alert('Akun berhasil diganti!');
     loadAssignments();
   }

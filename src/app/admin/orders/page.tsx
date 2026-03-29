@@ -33,15 +33,16 @@ export default function OrdersPage() {
 
   async function handleManualAssign(order: Order) {
     setAssigning(true);
-    const { data, error } = await adminRpc('assign_account_for_order', { p_order_id: order.id });
+    const result = await adminRpc('assign_account_for_order', { p_order_id: order.id });
     
-    if (error) {
-      alert('Error: ' + error.message);
+    if (result.error) {
+      alert('Error: ' + result.error);
       setAssigning(false);
       return;
     }
+    const data = result.data;
     if (data && !data.success) {
-      alert('Gagal: ' + data.error);
+      alert('Gagal: ' + (data.error || 'Tidak ada stok tersedia'));
       setAssigning(false);
       return;
     }
