@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { decrypt } from '@/lib/crypto';
 
 // CATATAN: Endpoint ini khusus digunakan admin (yang login dari dashboard frontend)
