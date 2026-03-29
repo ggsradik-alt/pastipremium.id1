@@ -60,7 +60,7 @@ export default function OrdersPage() {
 
   async function sendWA(order: Order) {
     const buyer = order.buyer as unknown as { name: string; phone: string };
-    const product = order.product as unknown as { name: string; duration_days: number };
+    const product = order.product as unknown as { name: string; duration_days: number; account_type: string };
 
     try {
       const { data: assignment, error: assignErr } = await supabase
@@ -84,13 +84,18 @@ export default function OrdersPage() {
       const password = decData.decrypted || 'Gagal-Dekripsi';
       const sa = assignment.stock_account;
 
+      const isSharing = product.account_type === 'sharing';
+      const catatan = isSharing
+        ? `\n_⚠️ Catatan (Akun Sharing):_\n*DILARANG* mengubah password, email, atau profil akun. Akun ini digunakan bersama — pelanggaran akan mengakibatkan akun diblokir tanpa pengembalian dana.`
+        : `\n_📌 Info (Akun Private):_\nAkun ini sepenuhnya milik Anda. Namun jika Anda *mengganti password*, garansi akun otomatis *hangus*. Kami sarankan untuk tidak mengubah sandi selama masa aktif.`;
+
       const text = `Halo *${buyer.name}*,\nPesanan Anda telah dikonfirmasi! ✅\n\nBerikut detail akun untuk produk *${product.name}*:\n\n` +
         `👤 *Email/User:* ${sa.account_identifier}\n` +
         `🔑 *Password:* ${password}\n` +
         (sa.profile_info ? `👤 *Profil:* ${sa.profile_info}\n` : '') +
         (sa.pin_info ? `🔐 *PIN:* ${sa.pin_info}\n` : '') +
         `\n⏳ *Masa Aktif:* ${product.duration_days} hari\n` +
-        `\n_Catatan:_\nMohon simpan akun ini baik-baik. Jangan ubah password / informasi akun jika ini akun sharing agar tidak mengganggu pengguna lain.\n\nTerima kasih telah berbelanja di *Pasti Premium.id*! 🙏`;
+        `${catatan}\n\nTerima kasih telah berbelanja di *Pasti Premium.id*! 🙏`;
 
       let phone = buyer.phone.replace(/[^0-9]/g, '');
       if (phone.startsWith('0')) phone = '62' + phone.substring(1);

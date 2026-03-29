@@ -277,18 +277,34 @@ function PaymentSuccessPage() {
               </div>
             )}
 
-            {/* Important Notice */}
-            <div style={{
-              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
-              borderRadius: 'var(--radius-md)', padding: '14px 16px', marginTop: '16px', marginBottom: '20px',
-            }}>
-              <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600, marginBottom: '4px' }}>⚠️ Penting!</div>
-              <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '16px', lineHeight: 1.6 }}>
-                <li>Jangan ubah password atau profil akun</li>
-                <li>Jangan share akun ke orang lain</li>
-                <li>Screenshot halaman ini untuk referensi</li>
-              </ul>
-            </div>
+            {/* Important Notice — dynamic by account type */}
+            {(product?.account_type as string) === 'sharing' ? (
+              <div style={{
+                background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
+                borderRadius: 'var(--radius-md)', padding: '14px 16px', marginTop: '16px', marginBottom: '20px',
+              }}>
+                <div style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600, marginBottom: '4px' }}>⚠️ Penting! (Akun Sharing)</div>
+                <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '16px', lineHeight: 1.6 }}>
+                  <li><strong style={{ color: '#ef4444' }}>DILARANG</strong> mengubah password, email, atau profil akun</li>
+                  <li>Akun ini digunakan bersama — jangan ubah pengaturan apapun</li>
+                  <li>Pelanggaran akan mengakibatkan akun diblokir tanpa pengembalian dana</li>
+                  <li>Screenshot halaman ini untuk referensi</li>
+                </ul>
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)',
+                borderRadius: 'var(--radius-md)', padding: '14px 16px', marginTop: '16px', marginBottom: '20px',
+              }}>
+                <div style={{ fontSize: '0.8rem', color: '#eab308', fontWeight: 600, marginBottom: '4px' }}>📌 Info Penting (Akun Private)</div>
+                <ul style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, paddingLeft: '16px', lineHeight: 1.6 }}>
+                  <li>Akun ini sepenuhnya milik Anda — bebas digunakan sesuka hati</li>
+                  <li>Jika Anda <strong style={{ color: '#eab308' }}>mengganti password</strong>, garansi akun otomatis <strong style={{ color: '#ef4444' }}>hangus</strong></li>
+                  <li>Kami sarankan untuk <strong>tidak mengubah sandi</strong> selama masa aktif agar garansi tetap berlaku</li>
+                  <li>Screenshot halaman ini untuk referensi</li>
+                </ul>
+              </div>
+            )}
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
