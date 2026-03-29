@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Only allow upload for pending/pending_payment orders
+    if (order.payment_status === 'waiting_confirmation') {
+      return NextResponse.json({ 
+        error: 'Bukti pembayaran sudah pernah dikirim dan sedang diverifikasi admin. Harap tunggu.',
+        already_uploaded: true 
+      }, { status: 400 });
+    }
+
     if (order.payment_status !== 'pending_payment' && order.payment_status !== 'pending') {
       return NextResponse.json({ error: 'Order sudah dibayar atau dibatalkan' }, { status: 400 });
     }

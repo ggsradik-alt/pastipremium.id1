@@ -57,6 +57,31 @@ export async function POST(request: NextRequest) {
       buyer = newBuyer;
     }
 
+    // Anti-spam: Check if buyer already has a pending order for the same product within last 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: existingOrder } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('buyer_id', buyer.id)
+      .eq('product_id', product.id)
+      .in('payment_status', ['pending_payment', 'waiting_confirmation'])
+      .gte('created_at', tenMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (existingOrder) {
+      // Return existing pending order instead of creating a new one
+      return NextResponse.json({
+        order_id: existingOrder.id,
+        order_number: existingOrder.order_number,
+        payment_status: existingOrder.payment_status,
+        order_status: existingOrder.order_status,
+        amount: existingOrder.total_amount,
+        reused: true,
+      });
+    }
+
     // Generate order number
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
