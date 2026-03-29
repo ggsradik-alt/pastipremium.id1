@@ -233,7 +233,7 @@ export default function AdminDashboardPage() {
           <h2>Dashboard</h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Monitoring Penjualan — Pasti Premium.id</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingRight: '60px' }}>
           <button className="btn btn-secondary btn-sm" onClick={() => { setLoading(true); loadDashboard(); }}>
             🔄 Refresh
           </button>
