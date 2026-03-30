@@ -102,14 +102,14 @@ export async function POST(request: NextRequest) {
       console.error('Auto-assign error:', assignErr);
     }
 
-    // Get product name for notification
+    // Get product name and type for notification
     const { data: product } = await supabase
       .from('products')
-      .select('name')
+      .select('name, account_type')
       .eq('id', order.product_id)
       .single();
 
-    // Send Telegram Notification
+    // Send Telegram Notification for payment
     const assigned = assignResult?.success ? '✅ Akun otomatis dikirim!' : '⚠️ Perlu assign akun manual';
     sendTelegramNotification(
       `💰 <b>PEMBAYARAN MASUK VIA PAKASIR!</b>\n\n` +
@@ -120,6 +120,33 @@ export async function POST(request: NextRequest) {
       `<b>Waktu:</b> ${completed_at || now}\n\n` +
       `${assigned}`
     );
+
+    // Check remaining stock if assignment was successful
+    if (assignResult?.success) {
+      try {
+        const { count: remainingStock } = await supabase
+          .from('stock_accounts')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', order.product_id)
+          .eq('status', 'active');
+
+        // Notify if stock is running low (1 or 0)
+        if (remainingStock !== null && remainingStock <= 1) {
+          const typeLabel = product?.account_type === 'sharing' ? 'Sharing' : 'Private';
+          const stockWarning = remainingStock === 0 ? 'HABIS! (0)' : 'tinggal 1';
+          
+          sendTelegramNotification(
+            `⚠️ <b>PERINGATAN STOK MENIPIS!</b>\n\n` +
+            `<b>Produk:</b> ${product?.name}\n` +
+            `<b>Tipe:</b> ${typeLabel}\n` +
+            `<b>Sisa Stok:</b> ${stockWarning}\n\n` +
+            `Mohon segera tambahkan stok baru untuk produk ini.`
+          );
+        }
+      } catch (stockErr) {
+        console.error('Error checking remaining stock:', stockErr);
+      }
+    }
 
     return NextResponse.json({ success: true, message: 'Payment processed' });
   } catch (err) {
