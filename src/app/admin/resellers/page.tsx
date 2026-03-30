@@ -74,8 +74,9 @@ export default function AdminResellersPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
+    let result;
     if (editingId) {
-      await adminUpdate('resellers', {
+      result = await adminUpdate('resellers', {
         name: form.name,
         phone: form.phone,
         commission_per_sale: form.commission_per_sale,
@@ -83,13 +84,18 @@ export default function AdminResellersPage() {
         updated_at: new Date().toISOString(),
       }, { id: editingId });
     } else {
-      await adminInsert('resellers', {
+      result = await adminInsert('resellers', {
         name: form.name,
         phone: form.phone,
         ref_code: form.ref_code.toUpperCase().replace(/[^A-Z0-9]/g, ''),
         commission_per_sale: form.commission_per_sale,
         status: form.status,
       });
+    }
+
+    if (result.error) {
+      alert('Gagal menyimpan: ' + result.error.message);
+      return;
     }
 
     setForm({ name: '', phone: '', ref_code: '', commission_per_sale: 3000, status: 'active' });
@@ -112,19 +118,22 @@ export default function AdminResellersPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Hapus reseller ini? Semua data komisinya juga akan terhapus.')) return;
-    await adminDelete('resellers', { id });
+    const result = await adminDelete('resellers', { id });
+    if (result.error) { alert('Gagal menghapus: ' + result.error.message); return; }
     loadResellers();
   }
 
   async function handlePayAll(reseller: Reseller) {
     if (!confirm(`Tandai semua komisi ${reseller.name} (${formatPrice(reseller.unpaid_commission)}) sebagai SUDAH DIBAYAR?`)) return;
 
-    await adminUpdate('reseller_commissions', { status: 'paid', paid_at: new Date().toISOString() }, { reseller_id: reseller.id });
+    const r1 = await adminUpdate('reseller_commissions', { status: 'paid', paid_at: new Date().toISOString() }, { reseller_id: reseller.id });
+    if (r1.error) { alert('Gagal update komisi: ' + r1.error.message); return; }
 
-    await adminUpdate('resellers', {
+    const r2 = await adminUpdate('resellers', {
       unpaid_commission: 0,
       updated_at: new Date().toISOString(),
     }, { id: reseller.id });
+    if (r2.error) { alert('Gagal update reseller: ' + r2.error.message); return; }
 
     loadResellers();
     if (selectedReseller?.id === reseller.id) loadCommissions(reseller.id);

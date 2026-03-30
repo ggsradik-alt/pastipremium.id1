@@ -65,7 +65,7 @@ export default function StockAccountsPage() {
     if (!confirm('Apakah Anda yakin ingin menghapus stok akun ini? Data yang dihapus tidak bisa dikembalikan.')) return;
     try {
       const res = await adminDelete('stock_accounts', { id });
-      if (res.error) { alert('Gagal: ' + res.error); return; }
+      if (res.error) { alert('Gagal: ' + res.error.message); return; }
       loadData();
     } catch {
       alert('Gagal menghapus stok akun.');
@@ -301,7 +301,8 @@ export default function StockAccountsPage() {
                             value={a.status}
                             style={{ padding: '4px 8px', fontSize: '0.75rem', width: 'auto' }}
                             onChange={async (e) => {
-                              await adminUpdate('stock_accounts', { status: e.target.value, updated_at: new Date().toISOString() }, { id: a.id });
+                              const result = await adminUpdate('stock_accounts', { status: e.target.value, updated_at: new Date().toISOString() }, { id: a.id });
+                              if (result.error) { alert('Gagal mengubah status: ' + result.error.message); return; }
                               loadData();
                             }}
                           >

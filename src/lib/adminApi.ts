@@ -8,15 +8,25 @@ function getAdminToken(): string {
 
 async function adminFetch(body: Record<string, unknown>) {
   const token = getAdminToken();
-  const res = await fetch('/api/admin/db', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
-  return res.json();
+  try {
+    const res = await fetch('/api/admin/db', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      // Normalize error shape: API returns { error: "string" } or { error: { message: "string" } }
+      const errMsg = typeof json.error === 'string' ? json.error : json.error?.message || `HTTP ${res.status}`;
+      return { error: { message: errMsg } };
+    }
+    return json;
+  } catch (err) {
+    return { error: { message: 'Gagal koneksi ke server: ' + (err as Error).message } };
+  }
 }
 
 export async function adminInsert(table: string, data: Record<string, unknown> | Record<string, unknown>[]) {

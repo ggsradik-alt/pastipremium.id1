@@ -30,9 +30,6 @@ function BuyerLookupPage() {
   const [assignments, setAssignments] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -107,45 +104,7 @@ function BuyerLookupPage() {
     setSearching(false);
   }
 
-  function handleProofFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 15 * 1024 * 1024) { setError('Ukuran file maksimal 15MB'); return; }
-    setProofFile(file);
-    setError('');
-    const reader = new FileReader();
-    reader.onload = () => setProofPreview(reader.result as string);
-    reader.readAsDataURL(file);
-  }
 
-  async function handleUploadProof() {
-    if (!proofFile || !selectedOrder) return;
-    setUploading(true);
-    setError('');
-    try {
-      const formData = new FormData();
-      formData.append('file', proofFile);
-      formData.append('order_number', selectedOrder.order_number as string);
-      const res = await fetch('/api/orders/upload-proof', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        alert('Bukti pembayaran berhasil diupload! Admin akan segera memverifikasi.');
-        setProofFile(null);
-        setProofPreview(null);
-        // Reload
-        if (buyer) {
-          await loadAllOrders(buyer.email);
-          const { data: updatedOrder } = await supabase.from('orders').select('*, product:products(*)').eq('order_number', selectedOrder.order_number).single();
-          if (updatedOrder) {
-            setSelectedOrder(updatedOrder);
-          }
-        }
-      } else {
-        setError(data.error || 'Gagal upload');
-      }
-    } catch { setError('Terjadi kesalahan jaringan.'); }
-    setUploading(false);
-  }
 
   function formatPrice(price: number) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
@@ -230,47 +189,30 @@ function BuyerLookupPage() {
               <div><span className="form-label">Payment:</span> <span className={`badge ${getStatusBadge(selectedOrder.payment_status as string)}`}>{selectedOrder.payment_status as string}</span></div>
             </div>
 
-            {/* Upload Bukti Transfer untuk pesanan pending */}
+            {/* Pay now CTA for pending orders */}
             {(selectedOrder.payment_status === 'pending_payment' || selectedOrder.payment_status === 'pending') && (
-              <div style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border-primary)', borderRadius: 'var(--radius-md)', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ background: 'linear-gradient(135deg, rgba(108,92,231,0.08), rgba(108,92,231,0.02))', border: '1px solid rgba(108,92,231,0.2)', borderRadius: 'var(--radius-md)', padding: '20px', marginBottom: '24px', textAlign: 'center' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  📸 Upload Bukti Transfer
+                  ⚡ Bayar Sekarang
                 </div>
-                {!proofPreview ? (
-                  <label style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    border: '2px dashed var(--border-primary)', borderRadius: 'var(--radius-md)',
-                    padding: '24px', cursor: 'pointer', background: 'var(--bg-card)',
-                  }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>📷</div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem' }}>Klik untuk pilih foto</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Semua Format Foto / PDF — Maks 15MB</div>
-                    <input type="file" accept="image/*,.heic,.pdf" onChange={handleProofFile} style={{ display: 'none' }} />
-                  </label>
-                ) : (
-                  <div style={{ position: 'relative', marginBottom: '12px' }}>
-                    <img src={proofPreview} alt="Bukti" style={{ width: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-secondary)' }} />
-                    <button onClick={() => { setProofFile(null); setProofPreview(null); }} style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer' }}>✕</button>
-                  </div>
-                )}
-                {error && <div style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '8px' }}>{error}</div>}
-                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '12px', opacity: proofFile ? 1 : 0.5 }} disabled={!proofFile || uploading} onClick={handleUploadProof}>
-                  {uploading ? <span className="loading-spinner" /> : '📤 Kirim Bukti Pembayaran'}
-                </button>
-              </div>
-            )}
-
-            {/* Waiting confirmation status */}
-            {selectedOrder.payment_status === 'waiting_confirmation' && (
-              <div style={{
-                background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)',
-                borderRadius: 'var(--radius-md)', padding: '20px', marginBottom: '24px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>⏳</div>
-                <div style={{ fontWeight: 700, color: '#eab308', marginBottom: '4px' }}>Menunggu Verifikasi Admin</div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Bukti pembayaran telah diterima. Admin sedang memverifikasi, biasanya 5-15 menit.
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  Lanjutkan pembayaran untuk mendapatkan akun premium Anda secara otomatis.
                 </p>
+                <button
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%', justifyContent: 'center', padding: '14px',
+                    background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)', border: 'none',
+                  }}
+                  onClick={() => {
+                    const product = selectedOrder.product as Record<string, unknown>;
+                    const redirectUrl = `${window.location.origin}/order/success?order=${selectedOrder.order_number}`;
+                    const pakasirUrl = `https://app.pakasir.com/pay/pastipremiumid1/${selectedOrder.total_amount}?order_id=${selectedOrder.order_number}&redirect=${encodeURIComponent(redirectUrl)}`;
+                    window.location.href = pakasirUrl;
+                  }}
+                >
+                  💳 Bayar via QRIS / Virtual Account
+                </button>
               </div>
             )}
 

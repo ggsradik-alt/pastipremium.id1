@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('buyer_id', buyer.id)
       .eq('product_id', product.id)
-      .in('payment_status', ['pending_payment', 'waiting_confirmation'])
+      .eq('payment_status', 'pending_payment')
       .gte('created_at', tenMinutesAgo)
       .order('created_at', { ascending: false })
       .limit(1)

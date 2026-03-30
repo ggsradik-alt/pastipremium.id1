@@ -41,7 +41,8 @@ export default function BuyersPage() {
                       <button
                         className={`btn btn-sm ${(b.status as string) === 'active' ? 'btn-danger' : 'btn-success'}`}
                         onClick={async () => {
-                          await adminUpdate('buyers', { status: (b.status as string) === 'active' ? 'blocked' : 'active', updated_at: new Date().toISOString() }, { id: b.id });
+                          const result = await adminUpdate('buyers', { status: (b.status as string) === 'active' ? 'blocked' : 'active', updated_at: new Date().toISOString() }, { id: b.id });
+                          if (result.error) { alert('Gagal: ' + result.error.message); return; }
                           loadBuyers();
                         }}
                       >

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { adminUpdate, adminRpc } from '@/lib/adminApi';
+import { adminRpc } from '@/lib/adminApi';
 import { Order } from '@/lib/types';
 
 const ITEMS_PER_PAGE = 15;
@@ -12,7 +12,6 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [assigning, setAssigning] = useState(false);
-  const [proofModal, setProofModal] = useState<Order | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
   // Feature 4: Search & Pagination
@@ -36,7 +35,7 @@ export default function OrdersPage() {
     const result = await adminRpc('assign_account_for_order', { p_order_id: order.id });
     
     if (result.error) {
-      alert('Error: ' + result.error);
+      alert('Error: ' + result.error.message);
       setAssigning(false);
       return;
     }
@@ -118,7 +117,7 @@ export default function OrdersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_number: order.order_number,
-          gateway_name: 'manual_transfer',
+          gateway_name: 'admin_override',
           gateway_reference: 'MANUAL-' + Date.now(),
           amount: order.total_amount,
           status: 'success',
@@ -127,7 +126,6 @@ export default function OrdersPage() {
       const data = await res.json();
       if (data.success) {
         alert('✅ Pembayaran dikonfirmasi! Auto-delivery berhasil.');
-        setProofModal(null);
         loadOrders();
       } else {
         alert('Error: ' + (data.error || 'Unknown'));
@@ -137,20 +135,7 @@ export default function OrdersPage() {
     }
   }
 
-  async function handleRejectPayment(order: Order) {
-    const reason = prompt('Alasan penolakan pembayaran:');
-    if (!reason) return;
 
-    await adminUpdate('orders', {
-      payment_status: 'pending_payment',
-      payment_proof_url: null,
-      updated_at: new Date().toISOString(),
-    }, { id: order.id });
-
-    alert(`Bukti pembayaran ditolak. Buyer dapat mengupload ulang.\nAlasan: ${reason}`);
-    setProofModal(null);
-    loadOrders();
-  }
 
   function formatPrice(price: number) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
@@ -161,7 +146,6 @@ export default function OrdersPage() {
       pending: 'badge-neutral', paid: 'badge-info', assigned: 'badge-primary',
       delivered: 'badge-success', completed: 'badge-success', cancelled: 'badge-danger',
       refunded: 'badge-warning', pending_payment: 'badge-neutral', failed: 'badge-danger',
-      waiting_confirmation: 'badge-warning',
     };
     return map[status] || 'badge-neutral';
   }
@@ -216,28 +200,12 @@ export default function OrdersPage() {
     setCurrentPage(1);
   }, [filterStatus, searchQuery, dateFilter]);
 
-  const waitingCount = orders.filter(o => o.payment_status === 'waiting_confirmation').length;
+
 
   return (
     <div className="admin-content">
       <div className="admin-topbar">
         <h2>Pesanan</h2>
-        {waitingCount > 0 && (
-          <div style={{
-            background: 'rgba(234,179,8,0.15)',
-            border: '1px solid rgba(234,179,8,0.3)',
-            borderRadius: 'var(--radius-full)',
-            padding: '6px 16px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            color: '#eab308',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            🔔 {waitingCount} bukti pembayaran menunggu verifikasi
-          </div>
-        )}
       </div>
       <div style={{ padding: '32px' }}>
         {/* Search & Date Filter */}
@@ -279,7 +247,6 @@ export default function OrdersPage() {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {[
             { key: 'all', label: 'Semua', count: orders.filter(o => o.payment_status !== 'pending_payment').length },
-            { key: 'waiting_confirmation', label: '⏳ Perlu Verifikasi', count: waitingCount },
             { key: 'pending_payment', label: 'Belum Bayar', count: orders.filter(o => o.payment_status === 'pending_payment').length },
             { key: 'paid', label: 'Sudah Bayar', count: orders.filter(o => o.payment_status === 'paid').length },
             { key: 'delivered', label: 'Terkirim', count: orders.filter(o => o.order_status === 'delivered').length },
@@ -315,30 +282,18 @@ export default function OrdersPage() {
                 </thead>
                 <tbody>
                   {paginatedOrders.map(o => (
-                    <tr key={o.id} style={{
-                      background: o.payment_status === 'waiting_confirmation' ? 'rgba(234,179,8,0.04)' : undefined,
-                    }}>
+                    <tr key={o.id}>
                       <td style={{ fontFamily: 'monospace', color: 'var(--brand-primary-light)' }}>{o.order_number}</td>
                       <td style={{ color: 'var(--text-primary)' }}>{(o.buyer as unknown as { name: string })?.name || '-'}</td>
                       <td>{(o.product as unknown as { name: string })?.name || '-'}</td>
                       <td style={{ color: 'var(--brand-success)' }}>{formatPrice(o.total_amount)}</td>
-                      <td><span className={`badge ${getStatusBadge(o.payment_status)}`}>{o.payment_status === 'waiting_confirmation' ? '⏳ Menunggu' : o.payment_status}</span></td>
+                      <td><span className={`badge ${getStatusBadge(o.payment_status)}`}>{o.payment_status}</span></td>
                       <td><span className={`badge ${getStatusBadge(o.order_status)}`}>{o.order_status}</span></td>
                       <td style={{ fontSize: '0.8rem' }}>{new Date(o.created_at).toLocaleString('id-ID')}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           <button className="btn btn-secondary btn-sm" onClick={() => setSelectedOrder(o)}>Detail</button>
                           
-                          {o.payment_status === 'waiting_confirmation' && (
-                            <button
-                              className="btn btn-sm"
-                              style={{ backgroundColor: '#eab308', color: '#000', border: 'none', fontWeight: 700 }}
-                              onClick={() => setProofModal(o)}
-                            >
-                              🔍 Cek Bukti
-                            </button>
-                          )}
-
                           {o.payment_status === 'pending_payment' && (
                             <button className="btn btn-success btn-sm" onClick={() => handleApprovePayment(o)}>✅ Konfirmasi</button>
                           )}
@@ -445,103 +400,14 @@ export default function OrdersPage() {
               {selectedOrder.paid_at && <div><span className="form-label">Paid At:</span> {new Date(selectedOrder.paid_at).toLocaleString('id-ID')}</div>}
               {selectedOrder.delivered_at && <div><span className="form-label">Delivered At:</span> {new Date(selectedOrder.delivered_at).toLocaleString('id-ID')}</div>}
               
-              {(selectedOrder as unknown as { payment_proof_url?: string }).payment_proof_url && (
-                <div>
-                  <span className="form-label">Bukti Transfer:</span>
-                  <img
-                    src={(selectedOrder as unknown as { payment_proof_url: string }).payment_proof_url}
-                    alt="Bukti Transfer"
-                    style={{ width: '100%', maxHeight: '300px', objectFit: 'contain', borderRadius: 'var(--radius-md)', marginTop: '8px', border: '1px solid var(--border-secondary)' }}
-                  />
-                </div>
-              )}
+
             </div>
             <div className="modal-actions"><button className="btn btn-secondary" onClick={() => setSelectedOrder(null)}>Tutup</button></div>
           </div>
         </div>
       )}
 
-      {/* Payment Proof Verification Modal */}
-      {proofModal && (
-        <div className="modal-overlay" onClick={() => setProofModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
-            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              🔍 Verifikasi Pembayaran
-            </h3>
-            
-            <div style={{
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-md)',
-              padding: '14px',
-              marginBottom: '16px',
-              display: 'grid',
-              gap: '8px',
-              fontSize: '0.85rem',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Order</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontFamily: 'monospace' }}>{proofModal.order_number}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Buyer</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{(proofModal.buyer as unknown as { name: string })?.name}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Nominal</span>
-                <span style={{ color: 'var(--brand-success)', fontWeight: 700, fontSize: '1.1rem' }}>{formatPrice(proofModal.total_amount)}</span>
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                📸 Bukti Transfer
-              </div>
-              {(proofModal as unknown as { payment_proof_url?: string }).payment_proof_url ? (
-                <img
-                  src={(proofModal as unknown as { payment_proof_url: string }).payment_proof_url}
-                  alt="Bukti Transfer"
-                  style={{
-                    width: '100%', maxHeight: '400px', objectFit: 'contain',
-                    borderRadius: 'var(--radius-md)', border: '1px solid var(--border-secondary)',
-                    background: '#000', cursor: 'pointer',
-                  }}
-                  onClick={() => window.open((proofModal as unknown as { payment_proof_url: string }).payment_proof_url, '_blank')}
-                />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                  No proof uploaded
-                </div>
-              )}
-            </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                className="btn btn-primary"
-                style={{ flex: 1, justifyContent: 'center', background: 'var(--brand-success)', border: 'none' }}
-                onClick={() => handleApprovePayment(proofModal)}
-              >
-                ✅ Approve & Auto-Deliver
-              </button>
-              <button
-                className="btn"
-                style={{ flex: 1, justifyContent: 'center', background: '#ef4444', color: '#fff', border: 'none' }}
-                onClick={() => handleRejectPayment(proofModal)}
-              >
-                ❌ Tolak
-              </button>
-            </div>
-            <div style={{ textAlign: 'center', marginTop: '12px' }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setProofModal(null)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

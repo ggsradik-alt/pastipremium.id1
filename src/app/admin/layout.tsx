@@ -14,7 +14,6 @@ const navItems = [
   { label: 'Pesanan', href: '/admin/orders', icon: '🛒' },
   { label: 'Assignment', href: '/admin/assignments', icon: '🔗' },
   { section: 'Manajemen' },
-  { label: 'Metode Pembayaran', href: '/admin/payment-methods', icon: '💳' },
   { label: 'Reseller / Mitra', href: '/admin/resellers', icon: '🤝' },
   { label: 'Buyer', href: '/admin/buyers', icon: '👥' },
   { label: 'Support Tickets', href: '/admin/support', icon: '🎫' },
@@ -23,7 +22,7 @@ const navItems = [
 
 interface RealtimeNotification {
   id: string;
-  type: 'new_order' | 'payment_proof' | 'support_ticket';
+  type: 'new_order' | 'support_ticket';
   message: string;
   time: Date;
   read: boolean;
@@ -37,16 +36,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
-  const [waitingVerifCount, setWaitingVerifCount] = useState(0);
 
   // Load initial pending counts
   const loadPendingCounts = useCallback(async () => {
-    const [{ count: pending }, { count: waiting }] = await Promise.all([
+    const [{ count: pending }] = await Promise.all([
       supabase.from('orders').select('*', { count: 'exact', head: true }).eq('payment_status', 'pending_payment'),
-      supabase.from('orders').select('*', { count: 'exact', head: true }).eq('payment_status', 'waiting_confirmation'),
     ]);
     setPendingOrdersCount(pending || 0);
-    setWaitingVerifCount(waiting || 0);
   }, []);
 
   useEffect(() => {
@@ -105,27 +101,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setNotifications(prev => [notif, ...prev].slice(0, 20));
           setPendingOrdersCount(prev => prev + 1);
           playNotifSound();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload) => {
-          const order = payload.new;
-          const old = payload.old;
-          // Detect payment proof uploaded (status changed to waiting_confirmation)
-          if (old.payment_status !== 'waiting_confirmation' && order.payment_status === 'waiting_confirmation') {
-            const notif: RealtimeNotification = {
-              id: `proof-${order.id}-${Date.now()}`,
-              type: 'payment_proof',
-              message: `💳 Bukti bayar masuk: ${order.order_number}`,
-              time: new Date(),
-              read: false,
-            };
-            setNotifications(prev => [notif, ...prev].slice(0, 20));
-            setWaitingVerifCount(prev => prev + 1);
-            playNotifSound();
-          }
         }
       )
       .subscribe();
@@ -206,7 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   function handleNotifClick(notif: RealtimeNotification) {
     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
     setShowNotifications(false);
-    if (notif.type === 'new_order' || notif.type === 'payment_proof') {
+    if (notif.type === 'new_order') {
       router.push('/admin/orders');
     } else if (notif.type === 'support_ticket') {
       router.push('/admin/support');
@@ -233,9 +208,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               : pathname.startsWith(item.href!);
             
             // Add badge for orders
-            const badge = item.href === '/admin/orders' && waitingVerifCount > 0
-              ? waitingVerifCount
-              : null;
+            const badge = null;
 
             return (
               <Link
@@ -314,18 +287,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           position: 'sticky', top: 0, zIndex: 90,
         }} className="desktop-notif-bar">
           {/* Pending counts */}
-          {(pendingOrdersCount > 0 || waitingVerifCount > 0) && (
+          {pendingOrdersCount > 0 && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {waitingVerifCount > 0 && (
-                <Link href="/admin/orders" style={{
-                  background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)',
-                  borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem',
-                  fontWeight: 600, color: '#eab308', textDecoration: 'none',
-                  animation: 'pulse 2s infinite',
-                }}>
-                  💳 {waitingVerifCount} Bukti Bayar
-                </Link>
-              )}
+              <Link href="/admin/orders" style={{
+                background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)',
+                borderRadius: '999px', padding: '4px 12px', fontSize: '0.75rem',
+                fontWeight: 600, color: '#eab308', textDecoration: 'none',
+              }}>
+                💳 {pendingOrdersCount} Belum Bayar
+              </Link>
             </div>
           )}
 

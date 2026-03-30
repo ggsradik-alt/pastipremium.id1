@@ -77,7 +77,8 @@ export default function ProductsPage() {
                           className="btn btn-danger btn-sm"
                           onClick={async () => {
                             if (confirm('Nonaktifkan produk ini?')) {
-                              await adminUpdate('products', { status: p.status === 'active' ? 'inactive' : 'active', updated_at: new Date().toISOString() }, { id: p.id });
+                              const result = await adminUpdate('products', { status: p.status === 'active' ? 'inactive' : 'active', updated_at: new Date().toISOString() }, { id: p.id });
+                              if (result.error) { alert('Gagal: ' + result.error.message); return; }
                               loadProducts();
                             }
                           }}

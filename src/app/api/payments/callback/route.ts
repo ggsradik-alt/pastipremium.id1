@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Payment already processed', idempotent: true });
     }
 
-    // Only allow processing for pending or waiting_confirmation orders
-    if (!['pending_payment', 'waiting_confirmation'].includes(order.payment_status)) {
+    // Only allow processing for pending payment orders
+    if (order.payment_status !== 'pending_payment') {
       return NextResponse.json({ error: 'Order tidak bisa diproses (status: ' + order.payment_status + ')' }, { status: 400 });
     }
 

@@ -30,7 +30,7 @@ export default function AssignmentsPage() {
       p_admin_id: admin.id,
     });
 
-    if (result.error) { alert('Error: ' + result.error); return; }
+    if (result.error) { alert('Error: ' + result.error.message); return; }
     if (result.data && !result.data.success) { alert('Gagal: ' + result.data.error); return; }
     alert('Akun berhasil diganti!');
     loadAssignments();
