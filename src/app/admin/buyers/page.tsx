@@ -16,9 +16,55 @@ export default function BuyersPage() {
     setLoading(false);
   }
 
+  function handleExportWA() {
+    const numbers = buyers
+      .map(b => b.phone as string)
+      .filter(p => !!p && p.trim().length >= 9) // basic check for valid-ish length
+      .map(phone => {
+        let cleaned = phone.replace(/\D/g, ''); // Remove non-numeric
+        if (cleaned.startsWith('0')) {
+          cleaned = '62' + cleaned.substring(1);
+        } else if (cleaned.startsWith('+62')) {
+          cleaned = '62' + cleaned.substring(3);
+        } else if (cleaned.startsWith('8')) {
+          cleaned = '62' + cleaned;
+        }
+        return cleaned;
+      });
+
+    const uniqueNumbers = Array.from(new Set(numbers));
+
+    if (uniqueNumbers.length === 0) {
+      alert('Tidak ada nomor WA yang tersedia.');
+      return;
+    }
+
+    const textContent = uniqueNumbers.join('\n');
+    const blob = new Blob([textContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `whatsapp_buyers_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="admin-content">
-      <div className="admin-topbar"><h2>Buyers</h2></div>
+      <div className="admin-topbar">
+        <h2>Buyers</h2>
+        <div className="admin-topbar-actions">
+          <button 
+            className="btn btn-success btn-sm" 
+            onClick={handleExportWA}
+            disabled={buyers.length === 0}
+          >
+            📋 Export WA (.txt)
+          </button>
+        </div>
+      </div>
       <div style={{ padding: '32px' }}>
         {loading ? (
           <div className="loading-page"><div className="loading-spinner" /></div>
