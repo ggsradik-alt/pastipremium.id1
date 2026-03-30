@@ -16,6 +16,7 @@ export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [buyer, setBuyer] = useState<BuyerSession | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     loadProducts();
@@ -84,30 +85,66 @@ export default function HomePage() {
           <h3>Belum ada produk</h3>
           <p>Produk akan segera tersedia. Stay tuned!</p>
         </div>
-      ) : (
+      ) : !selectedCategory ? (
         <div className="products-grid">
-          {products.map(product => (
-            <div key={product.id} className="product-card">
-              <div className="platform">{product.platform_name}</div>
-              <h3>{product.name}</h3>
-              {product.description && <p className="desc">{product.description}</p>}
-              <div className="meta">
-                <span className="price">{formatPrice(product.price)}</span>
-                <span className="duration">/ {product.duration_days} hari</span>
-                <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
-                  {product.account_type}
-                </span>
-              </div>
-              <Link 
-                href={`/order/${product.id}`} 
-                className="btn btn-primary" 
-                style={{ width: '100%', justifyContent: 'center' }}
+          {Array.from(new Set(products.map(p => p.platform_name))).map(category => {
+            const count = products.filter(p => p.platform_name === category).length;
+            return (
+              <div 
+                key={category} 
+                className="product-card" 
+                style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '32px 24px' }}
+                onClick={() => setSelectedCategory(category)}
               >
-                Beli Sekarang
-              </Link>
-            </div>
-          ))}
+                <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '16px', fontWeight: 'bold' }}>
+                  {category.charAt(0)}
+                </div>
+                <h3 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{category}</h3>
+                <span className="badge badge-neutral" style={{ padding: '6px 12px' }}>{count} Varian Paket</span>
+                
+                <div style={{ marginTop: '24px', width: '100%' }}>
+                  <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>Lihat Paket</button>
+                </div>
+              </div>
+            );
+          })}
         </div>
+      ) : (
+        <>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 32px 10px', display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setSelectedCategory(null)}
+              style={{ padding: '8px 16px' }}
+            >
+              ← Kembali
+            </button>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Varian {selectedCategory}</h2>
+          </div>
+          <div className="products-grid">
+            {products.filter(p => p.platform_name === selectedCategory).map(product => (
+              <div key={product.id} className="product-card">
+                <div className="platform">{product.platform_name}</div>
+                <h3>{product.name}</h3>
+                {product.description && <p className="desc">{product.description}</p>}
+                <div className="meta">
+                  <span className="price">{formatPrice(product.price)}</span>
+                  <span className="duration">/ {product.duration_days} hari</span>
+                  <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
+                    {product.account_type}
+                  </span>
+                </div>
+                <Link 
+                  href={`/order/${product.id}`} 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  Beli Sekarang
+                </Link>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <footer style={{ textAlign: 'center', padding: '40px 20px', borderTop: '1px solid var(--border-secondary)', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
