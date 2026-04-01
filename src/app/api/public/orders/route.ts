@@ -106,18 +106,14 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // Promo April Mop
-    const isPromoActive = new Date().getMonth() === 3 && new Date().getDate() === 1 && product.name === 'Supergrok Sharing 2 user 30 Day';
-    const displayPrice = isPromoActive ? 60000 : product.price;
-
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
         buyer_id: buyer.id,
         product_id: product.id,
-        unit_price: displayPrice,
-        total_amount: displayPrice,
+        unit_price: product.price,
+        total_amount: product.price,
         payment_status: 'pending_payment',
         order_status: 'pending',
         reseller_id: resellerId,
@@ -145,7 +141,7 @@ export async function POST(request: NextRequest) {
 
       let commissionAmount = 0;
       if (commissionType === 'percentage') {
-        commissionAmount = Math.round(displayPrice * commissionRate / 100);
+        commissionAmount = Math.round(product.price * commissionRate / 100);
       } else {
         commissionAmount = commissionRate;
       }
@@ -157,7 +153,7 @@ export async function POST(request: NextRequest) {
           order_id: order.id,
           product_id: product.id,
           product_name: product.name,
-          order_amount: displayPrice,
+          order_amount: product.price,
           commission_type: commissionType,
           commission_rate: commissionRate,
           commission_amount: commissionAmount,
@@ -180,7 +176,7 @@ export async function POST(request: NextRequest) {
       `🛒 <b>PESANAN BARU! (Belum Bayar)</b>\n\n` +
       `<b>Order:</b> <code>${orderNumber}</code>\n` +
       `<b>Produk:</b> ${product.name}\n` +
-      `<b>Harga:</b> Rp ${displayPrice.toLocaleString('id-ID')}\n\n` +
+      `<b>Harga:</b> Rp ${product.price.toLocaleString('id-ID')}\n\n` +
       `<b>Buyer:</b> ${buyer.name}\n` +
       `<b>WA:</b> ${buyer.phone}` +
       (reseller ? `\n\n🤝 <b>Via Reseller:</b> ${reseller.name} (${reseller.ref_code})` : '')

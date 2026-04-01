@@ -84,9 +84,8 @@ export default function OrderPage() {
   if (loading) return <div className="public-layout"><div className="loading-page"><div className="loading-spinner" /></div></div>;
   if (!product) return <div className="public-layout"><div className="empty-state"><h3>Produk tidak ditemukan</h3><Link href="/" className="btn btn-primary">Kembali</Link></div></div>;
 
-  const isPromoActive = new Date().getMonth() === 3 && new Date().getDate() === 1 && product.name === 'Supergrok Sharing 2 user 30 Day';
-  const originalPrice = 100000;
-  const displayPrice = isPromoActive ? 60000 : product.price;
+
+
 
   return (
     <div className="public-layout">
@@ -189,23 +188,9 @@ export default function OrderPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{product.name}</h4>
-                {isPromoActive && (
-                  <span className="badge badge-danger" style={{ animation: 'pulse 2s infinite' }}>
-                    PROMO APRIL!
-                  </span>
-                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                {isPromoActive ? (
-                  <>
-                    <span className="price" style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
-                      {formatPrice(originalPrice)}
-                    </span>
-                    <span className="price" style={{ color: 'var(--brand-danger)' }}>{formatPrice(displayPrice)}</span>
-                  </>
-                ) : (
-                  <span className="price">{formatPrice(product.price)}</span>
-                )}
+                <span className="price">{formatPrice(product.price)}</span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>/ {product.duration_days} hari</span>
                 <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>{product.account_type}</span>
               </div>
