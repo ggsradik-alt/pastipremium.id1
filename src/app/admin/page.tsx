@@ -68,10 +68,10 @@ export default function AdminDashboardPage() {
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
 
-    // Last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    // Last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
 
     const [
       { count: totalActiveProducts },
@@ -87,7 +87,7 @@ export default function AdminDashboardPage() {
       { count: totalBuyers },
       { data: allPaidOrders },
       { data: recentOrders },
-      { data: last7DaysOrders },
+      { data: last30DaysOrders },
       { data: allOrders },
     ] = await Promise.all([
       supabase.from('products').select('*', { count: 'exact', head: true }).eq('status', 'active'),
@@ -103,7 +103,7 @@ export default function AdminDashboardPage() {
       supabase.from('buyers').select('*', { count: 'exact', head: true }),
       supabase.from('orders').select('total_amount').eq('payment_status', 'paid'),
       supabase.from('orders').select('*, buyer:buyers(name, phone), product:products(name, platform_name)').order('created_at', { ascending: false }).limit(10),
-      supabase.from('orders').select('total_amount, created_at, payment_status, product_id').gte('created_at', sevenDaysAgo.toISOString()).eq('payment_status', 'paid'),
+      supabase.from('orders').select('total_amount, created_at, payment_status, product_id').gte('created_at', thirtyDaysAgo.toISOString()).eq('payment_status', 'paid'),
       supabase.from('orders').select('order_status'),
     ]);
 
@@ -112,22 +112,22 @@ export default function AdminDashboardPage() {
     const totalOrders = (allOrders || []).length;
 
     // Revenue today
-    const todayPaidOrders = (last7DaysOrders || []).filter((o: any) => {
+    const todayPaidOrders = (last30DaysOrders || []).filter((o: any) => {
       const d = new Date(o.created_at);
       return d >= today;
     });
     const revenueToday = todayPaidOrders.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
 
-    // Daily revenue chart data (last 7 days)
+    // Daily revenue chart data (last 30 days)
     const dailyRevenue: { date: string; revenue: number; orders: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       d.setHours(0, 0, 0, 0);
       const nextD = new Date(d);
       nextD.setDate(nextD.getDate() + 1);
 
-      const dayOrders = (last7DaysOrders || []).filter((o: any) => {
+      const dayOrders = (last30DaysOrders || []).filter((o: any) => {
         const od = new Date(o.created_at);
         return od >= d && od < nextD;
       });
@@ -293,29 +293,31 @@ export default function AdminDashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
           {/* Revenue Chart (Bar) */}
-          <div style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', padding: '24px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px' }}>📊 Revenue 7 Hari Terakhir</h3>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '180px' }}>
-              {data?.dailyRevenue.map((d, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                    {d.orders > 0 ? formatPrice(d.revenue) : '-'}
+          <div style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', padding: '24px', overflow: 'hidden' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px' }}>📊 Revenue 30 Hari Terakhir</h3>
+            <div style={{ overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'thin' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', height: '180px', minWidth: '900px' }}>
+                {data?.dailyRevenue.map((d, i) => (
+                  <div key={i} style={{ flex: 1, minWidth: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {d.orders > 0 ? formatPrice(d.revenue) : '-'}
+                    </div>
+                    <div
+                      style={{
+                        width: '100%',
+                        maxWidth: '48px',
+                        height: `${maxRevenue > 0 ? Math.max((d.revenue / maxRevenue) * 140, d.revenue > 0 ? 8 : 3) : 3}px`,
+                        background: d.revenue > 0 ? 'var(--accent)' : 'var(--border-secondary)',
+                        borderRadius: '6px 6px 2px 2px',
+                        transition: 'height 0.5s ease',
+                      }}
+                    />
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                      {d.date.split(' ').slice(0, 2).join(' ')}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      width: '100%',
-                      maxWidth: '48px',
-                      height: `${maxRevenue > 0 ? Math.max((d.revenue / maxRevenue) * 140, d.revenue > 0 ? 8 : 3) : 3}px`,
-                      background: d.revenue > 0 ? 'var(--accent)' : 'var(--border-secondary)',
-                      borderRadius: '6px 6px 2px 2px',
-                      transition: 'height 0.5s ease',
-                    }}
-                  />
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>
-                    {d.date.split(' ').slice(0, 2).join(' ')}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
