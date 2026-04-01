@@ -122,17 +122,42 @@ export default function HomePage() {
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Varian {selectedCategory}</h2>
           </div>
           <div className="products-grid">
-            {products.filter(p => p.platform_name === selectedCategory).map(product => (
-              <div key={product.id} className="product-card">
+            {products.filter(p => p.platform_name === selectedCategory).map(product => {
+              const isPromoActive = new Date().getMonth() === 3 && new Date().getDate() === 1 && product.name === 'Supergrok Sharing 2 user 30 Day';
+              const originalPrice = 100000;
+              const displayPrice = isPromoActive ? 60000 : product.price;
+
+              return (
+              <div key={product.id} className="product-card" style={isPromoActive ? { borderColor: 'var(--brand-danger)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' } : {}}>
                 <div className="platform">{product.platform_name}</div>
-                <h3>{product.name}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', marginBottom: '8px' }}>{product.name}</h3>
+                  {isPromoActive && (
+                    <span className="badge badge-danger" style={{ animation: 'pulse 2s infinite' }}>
+                      PROMO APRIL!
+                    </span>
+                  )}
+                </div>
                 {product.description && <p className="desc">{product.description}</p>}
-                <div className="meta">
-                  <span className="price">{formatPrice(product.price)}</span>
-                  <span className="duration">/ {product.duration_days} hari</span>
-                  <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
-                    {product.account_type}
-                  </span>
+                <div className="meta" style={isPromoActive ? { flexDirection: 'column', alignItems: 'flex-start', gap: '4px' } : {}}>
+                  {isPromoActive ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="price" style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 500 }}>
+                        {formatPrice(originalPrice)}
+                      </span>
+                      <span className="price" style={{ color: 'var(--brand-danger)' }}>
+                        {formatPrice(displayPrice)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="price">{formatPrice(product.price)}</span>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: isPromoActive ? '4px' : '0' }}>
+                    <span className="duration">/ {product.duration_days} hari</span>
+                    <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
+                      {product.account_type}
+                    </span>
+                  </div>
                 </div>
                 <Link 
                   href={`/order/${product.id}`} 
@@ -142,7 +167,7 @@ export default function HomePage() {
                   Beli Sekarang
                 </Link>
               </div>
-            ))}
+            )})}
           </div>
         </>
       )}

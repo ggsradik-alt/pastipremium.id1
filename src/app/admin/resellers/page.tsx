@@ -9,7 +9,8 @@ interface Reseller {
   name: string;
   phone: string;
   ref_code: string;
-  commission_per_sale: number;
+  default_commission_type: 'fixed' | 'percentage';
+  default_commission_value: number;
   status: string;
   total_sales: number;
   total_commission: number;
@@ -20,7 +21,11 @@ interface Reseller {
 interface Commission {
   id: string;
   reseller_id: string;
-  order_id: number;
+  order_id: string;
+  product_id?: number;
+  product_name?: string;
+  commission_type: 'fixed' | 'percentage';
+  commission_rate: number;
   commission_amount: number;
   status: string;
   paid_at: string | null;
@@ -28,27 +33,52 @@ interface Commission {
   order?: { order_number: string; total_amount: number; buyer: { name: string } };
 }
 
+interface Product {
+  id: number;
+  name: string;
+  price: number;
+}
+
+interface ResellerProductCommission {
+  id?: string;
+  reseller_id: string;
+  product_id: number;
+  commission_type: 'fixed' | 'percentage';
+  commission_value: number;
+}
+
 export default function AdminResellersPage() {
   const [resellers, setResellers] = useState<Reseller[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productCommissions, setProductCommissions] = useState<Record<number, ResellerProductCommission | null>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedReseller, setSelectedReseller] = useState<Reseller | null>(null);
-  const [tab, setTab] = useState<'resellers' | 'commissions'>('resellers');
+  const [tab, setTab] = useState<'resellers' | 'commissions' | 'product-commissions'>('resellers');
   const [copied, setCopied] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: '',
     phone: '',
     ref_code: '',
-    commission_per_sale: 3000,
+    default_commission_type: 'fixed' as 'fixed' | 'percentage',
+    default_commission_value: 3000,
     status: 'active',
   });
 
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
-  useEffect(() => { loadResellers(); }, []);
+  useEffect(() => { 
+    loadResellers(); 
+    loadProducts();
+  }, []);
+
+  async function loadProducts() {
+    const { data } = await supabase.from('products').select('id, name, price').eq('status', 'active');
+    if (data) setProducts(data);
+  }
 
   async function loadResellers() {
     setLoading(true);
@@ -58,6 +88,7 @@ export default function AdminResellersPage() {
   }
 
   async function loadCommissions(resellerId?: string) {
+    setLoading(true);
     let query = supabase
       .from('reseller_commissions')
       .select('*, order:orders(order_number, total_amount, buyer:buyers(name))')
@@ -69,6 +100,22 @@ export default function AdminResellersPage() {
 
     const { data } = await query;
     if (data) setCommissions(data as unknown as Commission[]);
+    setLoading(false);
+  }
+
+  async function editProductCommissions(r: Reseller) {
+    setSelectedReseller(r);
+    setTab('product-commissions');
+    setLoading(true);
+    const { data } = await supabase.from('reseller_product_commissions').select('*').eq('reseller_id', r.id);
+    const mapping: Record<number, ResellerProductCommission | null> = {};
+    if (data) {
+      data.forEach(item => {
+        mapping[item.product_id] = item;
+      });
+    }
+    setProductCommissions(mapping);
+    setLoading(false);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -79,7 +126,8 @@ export default function AdminResellersPage() {
       result = await adminUpdate('resellers', {
         name: form.name,
         phone: form.phone,
-        commission_per_sale: form.commission_per_sale,
+        default_commission_type: form.default_commission_type,
+        default_commission_value: form.default_commission_value,
         status: form.status,
         updated_at: new Date().toISOString(),
       }, { id: editingId });
@@ -88,7 +136,8 @@ export default function AdminResellersPage() {
         name: form.name,
         phone: form.phone,
         ref_code: form.ref_code.toUpperCase().replace(/[^A-Z0-9]/g, ''),
-        commission_per_sale: form.commission_per_sale,
+        default_commission_type: form.default_commission_type,
+        default_commission_value: form.default_commission_value,
         status: form.status,
       });
     }
@@ -98,7 +147,7 @@ export default function AdminResellersPage() {
       return;
     }
 
-    setForm({ name: '', phone: '', ref_code: '', commission_per_sale: 3000, status: 'active' });
+    setForm({ name: '', phone: '', ref_code: '', default_commission_type: 'fixed', default_commission_value: 3000, status: 'active' });
     setEditingId(null);
     setShowForm(false);
     loadResellers();
@@ -110,7 +159,8 @@ export default function AdminResellersPage() {
       name: r.name,
       phone: r.phone || '',
       ref_code: r.ref_code,
-      commission_per_sale: r.commission_per_sale,
+      default_commission_type: r.default_commission_type || 'fixed',
+      default_commission_value: r.default_commission_value || 0,
       status: r.status,
     });
     setShowForm(true);
@@ -150,6 +200,11 @@ export default function AdminResellersPage() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
   }
 
+  function formatCommission(type: string, value: number) {
+    if (type === 'percentage') return `${value}%`;
+    return formatPrice(value);
+  }
+
   function viewCommissions(r: Reseller) {
     setSelectedReseller(r);
     setTab('commissions');
@@ -165,7 +220,7 @@ export default function AdminResellersPage() {
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Reseller / Mitra</h1>
           <p style={{ color: 'var(--text-muted)' }}>Kelola karyawan freelance & komisi penjualan mereka.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ name: '', phone: '', ref_code: '', commission_per_sale: 3000, status: 'active' }); }}>
+        <button className="btn btn-primary" onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ name: '', phone: '', ref_code: '', default_commission_type: 'fixed', default_commission_value: 3000, status: 'active' }); }}>
           {showForm ? 'Tutup Form' : '+ Tambah Reseller'}
         </button>
       </div>
@@ -228,9 +283,18 @@ export default function AdminResellersPage() {
                 />
                 {!editingId && <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Huruf besar & angka saja. Ini akan jadi link unik reseller.</p>}
               </div>
-              <div className="form-group">
-                <label className="form-label">Komisi per Transaksi (Rp)</label>
-                <input required type="number" className="form-input" min={0} value={form.commission_per_sale} onChange={e => setForm({ ...form, commission_per_sale: parseInt(e.target.value) || 0 })} />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Tipe Default Komisi</label>
+                  <select className="form-input" value={form.default_commission_type} onChange={e => setForm({ ...form, default_commission_type: e.target.value as 'fixed' | 'percentage' })}>
+                    <option value="fixed">Fixed (Rp)</option>
+                    <option value="percentage">Persentase (%)</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">Nilai Default Komisi</label>
+                  <input required type="number" className="form-input" min={0} value={form.default_commission_value} onChange={e => setForm({ ...form, default_commission_value: parseInt(e.target.value) || 0 })} />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
@@ -250,7 +314,7 @@ export default function AdminResellersPage() {
                 <tr>
                   <th>Nama</th>
                   <th>Kode Ref</th>
-                  <th>Komisi/Sale</th>
+                  <th>Default Komisi</th>
                   <th>Penjualan</th>
                   <th>Belum Dibayar</th>
                   <th>Status</th>
@@ -272,7 +336,11 @@ export default function AdminResellersPage() {
                         </button>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--accent)' }}>{formatPrice(r.commission_per_sale)}</td>
+                    <td style={{ color: 'var(--accent)' }}>
+                      <span className="badge badge-secondary">
+                        {formatCommission(r.default_commission_type, r.default_commission_value)}
+                      </span>
+                    </td>
                     <td style={{ fontWeight: 700 }}>{r.total_sales}</td>
                     <td style={{ color: r.unpaid_commission > 0 ? '#eab308' : 'var(--text-muted)', fontWeight: 700 }}>
                       {formatPrice(r.unpaid_commission)}
@@ -282,6 +350,7 @@ export default function AdminResellersPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => editProductCommissions(r)}>⚙️ Atur Komisi</button>
                         <button className="btn btn-secondary btn-sm" onClick={() => viewCommissions(r)}>📊 Detail</button>
                         <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(r)}>Edit</button>
                         {r.unpaid_commission > 0 && (
@@ -303,52 +372,165 @@ export default function AdminResellersPage() {
         )
       )}
 
-      {/* COMMISSIONS TAB */}
-      {tab === 'commissions' && (
-        <div>
-          {selectedReseller && (
+      {/* PRODUCT COMMISSIONS TAB */}
+      {tab === 'product-commissions' && selectedReseller && (
+        loading ? <div className="loading-page"><div className="loading-spinner" /></div> : (
+          <div>
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Riwayat Komisi: {selectedReseller.name}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Kode: {selectedReseller.ref_code} — Komisi/sale: {formatPrice(selectedReseller.commission_per_sale)}</div>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Atur Komisi Per Produk: {selectedReseller.name}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Default Komisi: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type, selectedReseller.default_commission_value)}</strong>
+                </div>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedReseller(null); loadCommissions(); }}>Lihat Semua</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setTab('resellers'); loadResellers(); }}>Kembali</button>
             </div>
-          )}
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Order</th>
-                  <th>Buyer</th>
-                  <th>Harga Produk</th>
-                  <th>Komisi</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {commissions.map(c => (
-                  <tr key={c.id}>
-                    <td style={{ fontSize: '0.8rem' }}>{new Date(c.created_at).toLocaleString('id-ID')}</td>
-                    <td><code style={{ color: 'var(--accent)' }}>{c.order?.order_number || '-'}</code></td>
-                    <td>{(c.order?.buyer as any)?.name || '-'}</td>
-                    <td>{c.order?.total_amount ? formatPrice(c.order.total_amount) : '-'}</td>
-                    <td style={{ fontWeight: 700, color: 'var(--brand-success)' }}>{formatPrice(c.commission_amount)}</td>
-                    <td>
-                      <span className={`badge ${c.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
-                        {c.status === 'paid' ? '✅ Dibayar' : '⏳ Belum'}
-                      </span>
-                    </td>
+            
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Produk</th>
+                    <th>Harga</th>
+                    <th>Tipe Komisi</th>
+                    <th>Nilai Komisi</th>
+                    <th>Hasil Akhir</th>
+                    <th>Aksi</th>
                   </tr>
-                ))}
-                {commissions.length === 0 && (
-                  <tr><td colSpan={6} className="empty-state"><div className="icon">📊</div><h3>Belum ada riwayat komisi</h3></td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {products.map(p => {
+                    const customComm = productCommissions[p.id];
+                    const isCustom = !!customComm;
+                    const cType = customComm ? customComm.commission_type : selectedReseller.default_commission_type;
+                    const cVal = customComm ? customComm.commission_value : selectedReseller.default_commission_value;
+                    const finalAmount = cType === 'percentage' ? Math.round(p.price * cVal / 100) : cVal;
+                    
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ fontWeight: 600 }}>{p.name}</td>
+                        <td>{formatPrice(p.price)}</td>
+                        <td>
+                          <select 
+                            className="form-input" 
+                            style={{ padding: '6px', fontSize: '0.8rem', height: 'auto' }}
+                            value={isCustom ? cType : 'default'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'default') {
+                                if (customComm?.id) adminDelete('reseller_product_commissions', { id: customComm.id });
+                                setProductCommissions(prev => ({ ...prev, [p.id]: null }));
+                              } else {
+                                const newVal = val as 'fixed' | 'percentage';
+                                const valueToSet = customComm ? customComm.commission_value : 0;
+                                if (customComm?.id) {
+                                  adminUpdate('reseller_product_commissions', { commission_type: newVal }, { id: customComm.id });
+                                  setProductCommissions(prev => ({ ...prev, [p.id]: { ...customComm!, commission_type: newVal } }));
+                                } else {
+                                  adminInsert('reseller_product_commissions', { 
+                                    reseller_id: selectedReseller.id, 
+                                    product_id: p.id, 
+                                    commission_type: newVal, 
+                                    commission_value: valueToSet 
+                                  }).then(res => {
+                                    if (res.data?.[0]) setProductCommissions(prev => ({ ...prev, [p.id]: res.data[0] }));
+                                  });
+                                }
+                              }
+                            }}
+                          >
+                            <option value="default">Ikuti Default</option>
+                            <option value="fixed">Fixed (Rp)</option>
+                            <option value="percentage">Persentase (%)</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input 
+                            type="number" 
+                            className="form-input"
+                            style={{ padding: '6px', fontSize: '0.8rem', height: 'auto', width: '100px' }}
+                            disabled={!isCustom}
+                            value={isCustom ? (customComm?.commission_value || 0) : selectedReseller.default_commission_value}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              if (customComm?.id) {
+                                adminUpdate('reseller_product_commissions', { commission_value: val }, { id: customComm.id });
+                                setProductCommissions(prev => ({ ...prev, [p.id]: { ...customComm!, commission_value: val } }));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--brand-success)' }}>
+                          {formatPrice(finalAmount)}
+                        </td>
+                        <td>
+                          {isCustom && <span className="badge badge-primary">Khusus</span>}
+                          {!isCustom && <span className="badge badge-secondary">Default</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )
+      )}
+
+      {/* COMMISSIONS TAB */}
+      {tab === 'commissions' && (
+        loading ? <div className="loading-page"><div className="loading-spinner" /></div> : (
+          <div>
+            {selectedReseller && (
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Riwayat Komisi: {selectedReseller.name}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Kode: {selectedReseller.ref_code} — Default: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type, selectedReseller.default_commission_value)}</strong></div>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedReseller(null); loadCommissions(); }}>Lihat Semua</button>
+              </div>
+            )}
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Order & Pembeli</th>
+                    <th>Produk</th>
+                    <th>Harga & Rate</th>
+                    <th>Komisi Akhir</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissions.map(c => (
+                    <tr key={c.id}>
+                      <td style={{ fontSize: '0.8rem' }}>{new Date(c.created_at).toLocaleString('id-ID')}</td>
+                      <td>
+                        <div><code style={{ color: 'var(--accent)' }}>{c.order?.order_number || '-'}</code></div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{(c.order?.buyer as any)?.name || '-'}</div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{c.product_name || '-'}</td>
+                      <td>
+                        <div>{c.order_amount ? formatPrice(c.order_amount) : '-'}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate: {formatCommission(c.commission_type || 'fixed', c.commission_rate || 0)}</div>
+                      </td>
+                      <td style={{ fontWeight: 700, color: 'var(--brand-success)' }}>{formatPrice(c.commission_amount)}</td>
+                      <td>
+                        <span className={`badge ${c.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
+                          {c.status === 'paid' ? '✅ Dibayar' : '⏳ Belum'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {commissions.length === 0 && (
+                    <tr><td colSpan={6} className="empty-state"><div className="icon">📊</div><h3>Belum ada riwayat komisi</h3></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       )}
     </div>
   );

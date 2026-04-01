@@ -7,6 +7,7 @@ import { adminRpc } from '@/lib/adminApi';
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { loadAssignments(); }, []);
 
@@ -43,10 +44,29 @@ export default function AssignmentsPage() {
     return map[status] || 'badge-neutral';
   }
 
+  const filteredAssignments = assignments.filter((a: any) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const accountStr = (a.stock_account?.account_identifier || '').toLowerCase();
+    const buyerStr = (a.buyer?.name || '').toLowerCase();
+    const orderStr = (a.order?.order_number || '').toLowerCase();
+    return accountStr.includes(q) || buyerStr.includes(q) || orderStr.includes(q);
+  });
+
   return (
     <div className="admin-content">
       <div className="admin-topbar"><h2>Account Assignments</h2></div>
       <div style={{ padding: '32px' }}>
+        <div style={{ marginBottom: '24px', display: 'flex', gap: '16px' }}>
+          <input
+            type="text"
+            className="input"
+            placeholder="🔍 Cari akun, nama buyer, atau ID order..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ maxWidth: '400px', width: '100%' }}
+          />
+        </div>
         {loading ? (
           <div className="loading-page"><div className="loading-spinner" /></div>
         ) : (
@@ -67,7 +87,7 @@ export default function AssignmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((a: Record<string, unknown>) => (
+                {filteredAssignments.map((a: Record<string, unknown>) => (
                   <tr key={a.id as number}>
                     <td style={{ fontFamily: 'monospace' }}>#{a.id as number}</td>
                     <td style={{ fontFamily: 'monospace', color: 'var(--brand-primary-light)' }}>{(a.order as Record<string, string>)?.order_number || '-'}</td>
@@ -85,8 +105,8 @@ export default function AssignmentsPage() {
                     </td>
                   </tr>
                 ))}
-                {assignments.length === 0 && (
-                  <tr><td colSpan={10} className="empty-state"><div className="icon">🔗</div><h3>Belum ada assignment</h3></td></tr>
+                {filteredAssignments.length === 0 && (
+                  <tr><td colSpan={10} className="empty-state"><div className="icon">🔍</div><h3>Tidak ada assignment ditemukan</h3></td></tr>
                 )}
               </tbody>
             </table>

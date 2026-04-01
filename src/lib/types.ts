@@ -164,6 +164,45 @@ export interface AuditLog {
   admin?: Admin;
 }
 
+export interface Reseller {
+  id: string;
+  name: string;
+  phone: string | null;
+  ref_code: string;
+  default_commission_type: 'fixed' | 'percentage';
+  default_commission_value: number;
+  status: 'active' | 'inactive';
+  total_sales: number;
+  total_commission: number;
+  unpaid_commission: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResellerProductCommission {
+  id: string;
+  reseller_id: string;
+  product_id: number;
+  commission_type: 'fixed' | 'percentage';
+  commission_value: number;
+  created_at: string;
+}
+
+export interface ResellerCommission {
+  id: string;
+  reseller_id: string;
+  order_id: string;
+  product_id: number | null;
+  product_name: string | null;
+  order_amount: number;
+  commission_type: 'fixed' | 'percentage';
+  commission_rate: number;
+  commission_amount: number;
+  status: 'unpaid' | 'paid';
+  paid_at: string | null;
+  created_at: string;
+}
+
 // ===== Dashboard Stats =====
 export interface DashboardStats {
   totalActiveProducts: number;

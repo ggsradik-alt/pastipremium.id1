@@ -72,14 +72,13 @@ export default function BuyersPage() {
           <div className="table-container">
             <table className="table">
               <thead>
-                <tr><th>ID</th><th>Nama</th><th>Email</th><th>Phone</th><th>Status</th><th>Terdaftar</th><th>Aksi</th></tr>
+                <tr><th>ID</th><th>Nama</th><th>Phone</th><th>Status</th><th>Terdaftar</th><th>Aksi</th></tr>
               </thead>
               <tbody>
                 {buyers.map(b => (
                   <tr key={b.id as number}>
                     <td style={{ fontFamily: 'monospace' }}>#{b.id as number}</td>
                     <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{b.name as string}</td>
-                    <td>{(b.email as string) || '—'}</td>
                     <td>{(b.phone as string) || '—'}</td>
                     <td><span className={`badge ${(b.status as string) === 'active' ? 'badge-success' : 'badge-danger'}`}>{b.status as string}</span></td>
                     <td style={{ fontSize: '0.8rem' }}>{new Date(b.created_at as string).toLocaleDateString('id-ID')}</td>
@@ -98,7 +97,7 @@ export default function BuyersPage() {
                   </tr>
                 ))}
                 {buyers.length === 0 && (
-                  <tr><td colSpan={7} className="empty-state"><div className="icon">👥</div><h3>Belum ada buyer</h3></td></tr>
+                  <tr><td colSpan={6} className="empty-state"><div className="icon">👥</div><h3>Belum ada buyer</h3></td></tr>
                 )}
               </tbody>
             </table>

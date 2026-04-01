@@ -105,14 +105,19 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
+
+    // Promo April Mop
+    const isPromoActive = new Date().getMonth() === 3 && new Date().getDate() === 1 && product.name === 'Supergrok Sharing 2 user 30 Day';
+    const displayPrice = isPromoActive ? 60000 : product.price;
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
         buyer_id: buyer.id,
         product_id: product.id,
-        unit_price: product.price,
-        total_amount: product.price,
+        unit_price: displayPrice,
+        total_amount: displayPrice,
         payment_status: 'pending_payment',
         order_status: 'pending',
         reseller_id: resellerId,
@@ -128,21 +133,45 @@ export async function POST(request: NextRequest) {
 
     // Record commission if reseller exists
     if (reseller && order) {
-      const commission = reseller.commission_per_sale || 0;
-      // Insert commission record
-      await supabase.from('reseller_commissions').insert({
-        reseller_id: reseller.id,
-        order_id: order.id,
-        commission_amount: commission,
-        status: 'unpaid',
-      });
-      // Update reseller stats
-      await supabase.from('resellers').update({
-        total_sales: (reseller.total_sales || 0) + 1,
-        total_commission: (reseller.total_commission || 0) + commission,
-        unpaid_commission: (reseller.unpaid_commission || 0) + commission,
-        updated_at: now,
-      }).eq('id', reseller.id);
+      const { data: productCommission } = await supabase
+        .from('reseller_product_commissions')
+        .select('*')
+        .eq('reseller_id', reseller.id)
+        .eq('product_id', product.id)
+        .maybeSingle();
+
+      const commissionType = productCommission?.commission_type || reseller.default_commission_type || 'fixed';
+      const commissionRate = productCommission?.commission_value ?? (reseller.default_commission_value || 0);
+
+      let commissionAmount = 0;
+      if (commissionType === 'percentage') {
+        commissionAmount = Math.round(displayPrice * commissionRate / 100);
+      } else {
+        commissionAmount = commissionRate;
+      }
+
+      if (commissionAmount > 0) {
+        // Insert commission record
+        await supabase.from('reseller_commissions').insert({
+          reseller_id: reseller.id,
+          order_id: order.id,
+          product_id: product.id,
+          product_name: product.name,
+          order_amount: displayPrice,
+          commission_type: commissionType,
+          commission_rate: commissionRate,
+          commission_amount: commissionAmount,
+          status: 'unpaid',
+        });
+        
+        // Update reseller stats
+        await supabase.from('resellers').update({
+          total_sales: (reseller.total_sales || 0) + 1,
+          total_commission: (reseller.total_commission || 0) + commissionAmount,
+          unpaid_commission: (reseller.unpaid_commission || 0) + commissionAmount,
+          updated_at: now,
+        }).eq('id', reseller.id);
+      }
     }
 
     // Send Telegram Notification
@@ -151,7 +180,7 @@ export async function POST(request: NextRequest) {
       `🛒 <b>PESANAN BARU! (Belum Bayar)</b>\n\n` +
       `<b>Order:</b> <code>${orderNumber}</code>\n` +
       `<b>Produk:</b> ${product.name}\n` +
-      `<b>Harga:</b> Rp ${product.price.toLocaleString('id-ID')}\n\n` +
+      `<b>Harga:</b> Rp ${displayPrice.toLocaleString('id-ID')}\n\n` +
       `<b>Buyer:</b> ${buyer.name}\n` +
       `<b>WA:</b> ${buyer.phone}` +
       (reseller ? `\n\n🤝 <b>Via Reseller:</b> ${reseller.name} (${reseller.ref_code})` : '')
