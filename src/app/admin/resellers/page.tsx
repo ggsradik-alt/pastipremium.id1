@@ -24,6 +24,7 @@ interface Commission {
   order_id: string;
   product_id?: number;
   product_name?: string;
+  order_amount?: number;
   commission_type: 'fixed' | 'percentage';
   commission_rate: number;
   commission_amount: number;
@@ -338,7 +339,7 @@ export default function AdminResellersPage() {
                     </td>
                     <td style={{ color: 'var(--accent)' }}>
                       <span className="badge badge-secondary">
-                        {formatCommission(r.default_commission_type, r.default_commission_value)}
+                        {formatCommission(r.default_commission_type || 'fixed', r.default_commission_value || 0)}
                       </span>
                     </td>
                     <td style={{ fontWeight: 700 }}>{r.total_sales}</td>
@@ -380,7 +381,7 @@ export default function AdminResellersPage() {
               <div>
                 <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Atur Komisi Per Produk: {selectedReseller.name}</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Default Komisi: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type, selectedReseller.default_commission_value)}</strong>
+                  Default Komisi: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type || 'fixed', selectedReseller.default_commission_value || 0)}</strong>
                 </div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={() => { setTab('resellers'); loadResellers(); }}>Kembali</button>
@@ -402,8 +403,8 @@ export default function AdminResellersPage() {
                   {products.map(p => {
                     const customComm = productCommissions[p.id];
                     const isCustom = !!customComm;
-                    const cType = customComm ? customComm.commission_type : selectedReseller.default_commission_type;
-                    const cVal = customComm ? customComm.commission_value : selectedReseller.default_commission_value;
+                    const cType = customComm ? customComm.commission_type : (selectedReseller.default_commission_type || 'fixed');
+                    const cVal = customComm ? customComm.commission_value : (selectedReseller.default_commission_value || 0);
                     const finalAmount = cType === 'percentage' ? Math.round(p.price * cVal / 100) : cVal;
                     
                     return (
@@ -450,7 +451,7 @@ export default function AdminResellersPage() {
                             className="form-input"
                             style={{ padding: '6px', fontSize: '0.8rem', height: 'auto', width: '100px' }}
                             disabled={!isCustom}
-                            value={isCustom ? (customComm?.commission_value || 0) : selectedReseller.default_commission_value}
+                            value={isCustom ? (customComm?.commission_value || 0) : (selectedReseller.default_commission_value || 0)}
                             onChange={(e) => {
                               const val = parseInt(e.target.value) || 0;
                               if (customComm?.id) {
@@ -485,7 +486,7 @@ export default function AdminResellersPage() {
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-secondary)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Riwayat Komisi: {selectedReseller.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Kode: {selectedReseller.ref_code} — Default: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type, selectedReseller.default_commission_value)}</strong></div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Kode: {selectedReseller.ref_code} — Default: <strong style={{ color: 'var(--accent)' }}>{formatCommission(selectedReseller.default_commission_type || 'fixed', selectedReseller.default_commission_value || 0)}</strong></div>
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={() => { setSelectedReseller(null); loadCommissions(); }}>Lihat Semua</button>
               </div>
