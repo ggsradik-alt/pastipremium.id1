@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface SalesData {
@@ -35,8 +35,17 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<SalesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [expiringLoading, setExpiringLoading] = useState(false);
+  const chartScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  useEffect(() => {
+    // Automatically scroll the chart to the rightmost edge (latest dates) 
+    // when data finishes loading.
+    if (chartScrollRef.current && data) {
+      chartScrollRef.current.scrollLeft = chartScrollRef.current.scrollWidth;
+    }
+  }, [data]);
 
   async function handleAutoExpire() {
     setExpiringLoading(true);
@@ -295,7 +304,7 @@ export default function AdminDashboardPage() {
           {/* Revenue Chart (Bar) */}
           <div style={{ background: 'var(--card-bg)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-primary)', padding: '24px', overflow: 'hidden' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px' }}>📊 Revenue 30 Hari Terakhir</h3>
-            <div style={{ overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'thin' }}>
+            <div ref={chartScrollRef} className="custom-scrollbar" style={{ overflowX: 'auto', paddingBottom: '16px', scrollbarWidth: 'thin' }}>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', height: '180px', minWidth: '900px' }}>
                 {data?.dailyRevenue.map((d, i) => (
                   <div key={i} style={{ flex: 1, minWidth: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
