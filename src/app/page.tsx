@@ -5,6 +5,17 @@ import { supabase } from '@/lib/supabase';
 import { Product } from '@/lib/types';
 import Link from 'next/link';
 
+interface Promo {
+  id: string;
+  product_id: number;
+  promo_label: string;
+  original_price: number;
+  promo_price: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+}
+
 interface BuyerSession {
   id: number;
   name: string;
@@ -14,6 +25,7 @@ interface BuyerSession {
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [promos, setPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
   const [buyer, setBuyer] = useState<BuyerSession | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -35,12 +47,12 @@ export default function HomePage() {
   }, []);
 
   async function loadProducts() {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('status', 'active')
-      .order('platform_name', { ascending: true });
-    setProducts(data || []);
+    const [{ data: pData }, { data: promoData }] = await Promise.all([
+      supabase.from('products').select('*').eq('status', 'active').order('platform_name', { ascending: true }),
+      supabase.from('promos').select('*').eq('is_active', true)
+    ]);
+    setProducts(pData || []);
+    setPromos(promoData || []);
     setLoading(false);
   }
 
@@ -122,16 +134,38 @@ export default function HomePage() {
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Varian {selectedCategory}</h2>
           </div>
           <div className="products-grid">
-            {products.filter(p => p.platform_name === selectedCategory).map(product => (
-              <div key={product.id} className="product-card">
+            {products.filter(p => p.platform_name === selectedCategory).map(product => {
+              const promo = promos.find(pr => {
+                const now = new Date();
+                return pr.product_id === product.id && new Date(pr.start_date) <= now && new Date(pr.end_date) >= now;
+              });
+
+              return (
+              <div key={product.id} className="product-card" style={promo ? { borderColor: 'var(--brand-danger)', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' } : {}}>
                 <div className="platform">{product.platform_name}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <h3 style={{ margin: 0, fontSize: '1.1rem', marginBottom: '8px' }}>{product.name}</h3>
+                  {promo && (
+                    <span className="badge badge-danger" style={{ animation: 'pulse 2s infinite' }}>
+                      {promo.promo_label.toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 {product.description && <p className="desc">{product.description}</p>}
-                <div className="meta">
-                  <span className="price">{formatPrice(product.price)}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="meta" style={promo ? { flexDirection: 'column', alignItems: 'flex-start', gap: '4px' } : {}}>
+                  {promo ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="price" style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 500 }}>
+                        {formatPrice(promo.original_price)}
+                      </span>
+                      <span className="price" style={{ color: 'var(--brand-danger)' }}>
+                        {formatPrice(promo.promo_price)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="price">{formatPrice(product.price)}</span>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: promo ? '4px' : '0' }}>
                     <span className="duration">/ {product.duration_days} hari</span>
                     <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>
                       {product.account_type}
@@ -146,7 +180,7 @@ export default function HomePage() {
                   Beli Sekarang
                 </Link>
               </div>
-            ))}
+            )})}
           </div>
         </>
       )}

@@ -20,6 +20,7 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [buyer, setBuyer] = useState<BuyerSession | null>(null);
+  const [promo, setPromo] = useState<any>(null);
   const [result, setResult] = useState<{ order_number: string; amount: number } | null>(null);
   const [error, setError] = useState('');
 
@@ -34,6 +35,18 @@ export default function OrderPage() {
     async function load() {
       const { data } = await supabase.from('products').select('*').eq('id', params.productId).eq('status', 'active').single();
       setProduct(data);
+      if (data) {
+        const now = new Date().toISOString();
+        const { data: promoData } = await supabase
+          .from('promos')
+          .select('*')
+          .eq('product_id', data.id)
+          .eq('is_active', true)
+          .lte('start_date', now)
+          .gte('end_date', now)
+          .maybeSingle();
+        setPromo(promoData || null);
+      }
       setLoading(false);
     }
     load();
@@ -84,8 +97,7 @@ export default function OrderPage() {
   if (loading) return <div className="public-layout"><div className="loading-page"><div className="loading-spinner" /></div></div>;
   if (!product) return <div className="public-layout"><div className="empty-state"><h3>Produk tidak ditemukan</h3><Link href="/" className="btn btn-primary">Kembali</Link></div></div>;
 
-
-
+  const displayPrice = promo ? promo.promo_price : product.price;
 
   return (
     <div className="public-layout">
@@ -188,9 +200,23 @@ export default function OrderPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{product.name}</h4>
+                {promo && (
+                  <span className="badge badge-danger" style={{ animation: 'pulse 2s infinite' }}>
+                    {promo.promo_label.toUpperCase()}
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <span className="price">{formatPrice(product.price)}</span>
+                {promo ? (
+                  <>
+                    <span className="price" style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
+                      {formatPrice(promo.original_price)}
+                    </span>
+                    <span className="price" style={{ color: 'var(--brand-danger)' }}>{formatPrice(displayPrice)}</span>
+                  </>
+                ) : (
+                  <span className="price">{formatPrice(product.price)}</span>
+                )}
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>/ {product.duration_days} hari</span>
                 <span className={`badge ${product.account_type === 'sharing' ? 'badge-info' : 'badge-primary'}`}>{product.account_type}</span>
               </div>

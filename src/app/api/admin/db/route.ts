@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       'products', 'stock_accounts', 'buyers', 'orders', 'payments',
       'account_assignments', 'payment_methods', 'resellers',
       'reseller_commissions', 'reseller_product_commissions', 'support_tickets', 'audit_logs',
+      'promos',
     ];
     if (!allowedTables.includes(table)) {
       return NextResponse.json({ error: 'Table not allowed' }, { status: 403 });

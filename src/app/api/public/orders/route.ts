@@ -106,14 +106,25 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
+    const { data: promo } = await supabase
+      .from('promos')
+      .select('*')
+      .eq('product_id', product.id)
+      .eq('is_active', true)
+      .lte('start_date', now)
+      .gte('end_date', now)
+      .maybeSingle();
+
+    const finalPrice = promo ? promo.promo_price : product.price;
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         order_number: orderNumber,
         buyer_id: buyer.id,
         product_id: product.id,
-        unit_price: product.price,
-        total_amount: product.price,
+        unit_price: finalPrice,
+        total_amount: finalPrice,
         payment_status: 'pending_payment',
         order_status: 'pending',
         reseller_id: resellerId,
@@ -141,7 +152,7 @@ export async function POST(request: NextRequest) {
 
       let commissionAmount = 0;
       if (commissionType === 'percentage') {
-        commissionAmount = Math.round(product.price * commissionRate / 100);
+        commissionAmount = Math.round(finalPrice * commissionRate / 100);
       } else {
         commissionAmount = commissionRate;
       }
@@ -153,7 +164,7 @@ export async function POST(request: NextRequest) {
           order_id: order.id,
           product_id: product.id,
           product_name: product.name,
-          order_amount: product.price,
+          order_amount: finalPrice,
           commission_type: commissionType,
           commission_rate: commissionRate,
           commission_amount: commissionAmount,
@@ -176,7 +187,7 @@ export async function POST(request: NextRequest) {
       `🛒 <b>PESANAN BARU! (Belum Bayar)</b>\n\n` +
       `<b>Order:</b> <code>${orderNumber}</code>\n` +
       `<b>Produk:</b> ${product.name}\n` +
-      `<b>Harga:</b> Rp ${product.price.toLocaleString('id-ID')}\n\n` +
+      `<b>Harga:</b> Rp ${finalPrice.toLocaleString('id-ID')}\n\n` +
       `<b>Buyer:</b> ${buyer.name}\n` +
       `<b>WA:</b> ${buyer.phone}` +
       (reseller ? `\n\n🤝 <b>Via Reseller:</b> ${reseller.name} (${reseller.ref_code})` : '')
