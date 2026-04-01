@@ -214,6 +214,35 @@ export default function AdminResellersPage() {
 
   const totalUnpaid = resellers.reduce((sum, r) => sum + r.unpaid_commission, 0);
 
+  async function handleApplyToAll(productId: number, pName: string, cType: string, cVal: number) {
+    if (!confirm(`Konfirmasi: Terapkan komisi ${formatCommission(cType, cVal)} untuk produk "${pName}" ke SELURUH reseller yang aktif?`)) return;
+    
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/commissions/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+        },
+        body: JSON.stringify({
+          productId: productId,
+          commissionType: cType,
+          commissionValue: cVal
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Gagal menerapkan ke semua');
+      
+      alert(`Berhasil diterapkan ke ${json.count} reseller aktif!`);
+      if (selectedReseller) editProductCommissions(selectedReseller);
+    } catch (err: any) {
+      alert(err.message);
+      setLoading(false);
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -465,8 +494,19 @@ export default function AdminResellersPage() {
                           {formatPrice(finalAmount)}
                         </td>
                         <td>
-                          {isCustom && <span className="badge badge-primary">Khusus</span>}
-                          {!isCustom && <span className="badge badge-secondary">Default</span>}
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {isCustom ? <span className="badge badge-primary">Khusus</span> : <span className="badge badge-secondary">Default</span>}
+                            {isCustom && (
+                              <button 
+                                className="btn btn-sm" 
+                                style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 600 }}
+                                onClick={() => handleApplyToAll(p.id, p.name, cType, cVal)}
+                                title="Set komisi ini ke SELURUH Reseller"
+                              >
+                                👥 Terapkan Semua
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
