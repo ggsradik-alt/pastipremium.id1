@@ -62,6 +62,25 @@ function PaymentSuccessPage() {
     }
   }, [orderNumber]);
 
+  // Active check: call our API which queries Pakasir directly
+  const checkPakasirDirectly = useCallback(async () => {
+    if (!orderNumber) return;
+    try {
+      const res = await fetch('/api/public/check-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_number: orderNumber }),
+      });
+      const data = await res.json();
+      if (data.status === 'paid' || data.synced) {
+        // Payment confirmed! Re-check order status from DB
+        await checkOrderStatus();
+      }
+    } catch {
+      // Silently fail — will retry on next poll
+    }
+  }, [orderNumber, checkOrderStatus]);
+
   // Poll every 3 seconds for status update
   useEffect(() => {
     if (!orderNumber) {
@@ -74,7 +93,14 @@ function PaymentSuccessPage() {
 
     const interval = setInterval(() => {
       if (status === 'waiting') {
-        setPollCount(prev => prev + 1);
+        setPollCount(prev => {
+          const newCount = prev + 1;
+          // Every 5th poll (every ~15s), also actively check with Pakasir API
+          if (newCount % 5 === 0) {
+            checkPakasirDirectly();
+          }
+          return newCount;
+        });
         checkOrderStatus();
       }
     }, 3000);
@@ -88,7 +114,7 @@ function PaymentSuccessPage() {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [orderNumber, status, checkOrderStatus, router]);
+  }, [orderNumber, status, checkOrderStatus, checkPakasirDirectly, router]);
 
   function formatPrice(price: number) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
