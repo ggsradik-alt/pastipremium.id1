@@ -96,7 +96,7 @@ export default function OrdersPage() {
         (sa.profile_info ? `👤 *Profil:* ${sa.profile_info}\n` : '') +
         (sa.pin_info ? `🔐 *PIN:* ${sa.pin_info}\n` : '') +
         `\n⏳ *Masa Aktif:* ${product.duration_days} hari\n` +
-        `${catatan}\n\nTerima kasih telah berbelanja di *Pasti Premium.id*! 🙏`;
+        `${catatan}\n\nTerima kasih telah berbelanja di *pastipremium.store*! 🙏`;
 
       let phone = buyer.phone.replace(/[^0-9]/g, '');
       if (phone.startsWith('0')) phone = '62' + phone.substring(1);

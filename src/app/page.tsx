@@ -38,11 +38,19 @@ export default function HomePage() {
       setBuyer(JSON.parse(session));
     }
 
-    // Capture referral code from URL (?ref=CODE)
+    // Capture referral code from URL (?ref=CODE) with 30-day TTL
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
       localStorage.setItem('ref_code', ref.toUpperCase());
+      localStorage.setItem('ref_code_ts', Date.now().toString());
+    } else {
+      // Clear expired ref_code (older than 30 days)
+      const refTs = localStorage.getItem('ref_code_ts');
+      if (refTs && Date.now() - Number(refTs) > 30 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('ref_code');
+        localStorage.removeItem('ref_code_ts');
+      }
     }
   }, []);
 
@@ -68,7 +76,7 @@ export default function HomePage() {
   return (
     <div className="public-layout">
       <header className="public-header" style={{ justifyContent: 'space-between' }}>
-        <span className="brand">✦ Pasti Premium.id</span>
+        <span className="brand">✦ pastipremium.store</span>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {buyer ? (
             <>
@@ -186,7 +194,7 @@ export default function HomePage() {
       )}
 
       <footer style={{ textAlign: 'center', padding: '40px 20px', borderTop: '1px solid var(--border-secondary)', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-        <p>© 2024 Pasti Premium.id. All rights reserved.</p>
+        <p>© 2024 pastipremium.store. All rights reserved.</p>
       </footer>
     </div>
   );

@@ -119,7 +119,7 @@ export default function AdminLoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>Pasti Premium.id</h1>
+        <h1>pastipremium.store</h1>
         <p className="subtitle">Admin Dashboard</p>
 
         {error && <div className="login-error">{error}</div>}

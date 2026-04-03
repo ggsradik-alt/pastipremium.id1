@@ -13,7 +13,7 @@ export default function SupportPage() {
   async function loadTickets() {
     const { data } = await supabase
       .from('support_tickets')
-      .select('*, buyer:buyers(name), order:orders(order_number)')
+      .select('*, buyer:buyers(name, phone), order:orders(order_number)')
       .order('created_at', { ascending: false });
     setTickets(data || []);
     setLoading(false);
@@ -42,7 +42,10 @@ export default function SupportPage() {
                 {tickets.map(t => (
                   <tr key={t.id as number}>
                     <td style={{ fontFamily: 'monospace' }}>#{t.id as number}</td>
-                    <td style={{ color: 'var(--text-primary)' }}>{(t.buyer as Record<string, string>)?.name || '-'}</td>
+                    <td style={{ color: 'var(--text-primary)' }}>
+                      <div>{(t.buyer as Record<string, string>)?.name || '-'}</div>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{(t.buyer as Record<string, string>)?.phone || ''}</div>
+                    </td>
                     <td style={{ fontFamily: 'monospace' }}>{(t.order as Record<string, string>)?.order_number || '—'}</td>
                     <td style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{t.subject as string}</td>
                     <td><span className={`badge ${getStatusBadge(t.status as string)}`}>{t.status as string}</span></td>

@@ -99,7 +99,7 @@ function PaymentSuccessPage() {
   return (
     <div className="public-layout">
       <header className="public-header" style={{ justifyContent: 'space-between' }}>
-        <Link href="/" className="brand">✦ Pasti Premium.id</Link>
+        <Link href="/" className="brand">✦ pastipremium.store</Link>
       </header>
 
       <div className="order-form-container">

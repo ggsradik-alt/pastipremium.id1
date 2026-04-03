@@ -177,7 +177,7 @@ export default function AdminResellersPage() {
   async function handlePayAll(reseller: Reseller) {
     if (!confirm(`Tandai semua komisi ${reseller.name} (${formatPrice(reseller.unpaid_commission)}) sebagai SUDAH DIBAYAR?`)) return;
 
-    const r1 = await adminUpdate('reseller_commissions', { status: 'paid', paid_at: new Date().toISOString() }, { reseller_id: reseller.id });
+    const r1 = await adminUpdate('reseller_commissions', { status: 'paid', paid_at: new Date().toISOString() }, { reseller_id: reseller.id, status: 'unpaid' });
     if (r1.error) { alert('Gagal update komisi: ' + r1.error.message); return; }
 
     const r2 = await adminUpdate('resellers', {
@@ -445,26 +445,30 @@ export default function AdminResellersPage() {
                             className="form-input" 
                             style={{ padding: '6px', fontSize: '0.8rem', height: 'auto' }}
                             value={isCustom ? cType : 'default'}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const val = e.target.value;
                               if (val === 'default') {
-                                if (customComm?.id) adminDelete('reseller_product_commissions', { id: customComm.id });
+                                if (customComm?.id) {
+                                  const res = await adminDelete('reseller_product_commissions', { id: customComm.id });
+                                  if (res.error) { alert('Gagal menghapus: ' + res.error.message); return; }
+                                }
                                 setProductCommissions(prev => ({ ...prev, [p.id]: null }));
                               } else {
                                 const newVal = val as 'fixed' | 'percentage';
                                 const valueToSet = customComm ? customComm.commission_value : 0;
                                 if (customComm?.id) {
-                                  adminUpdate('reseller_product_commissions', { commission_type: newVal }, { id: customComm.id });
+                                  const res = await adminUpdate('reseller_product_commissions', { commission_type: newVal }, { id: customComm.id });
+                                  if (res.error) { alert('Gagal update tipe: ' + res.error.message); return; }
                                   setProductCommissions(prev => ({ ...prev, [p.id]: { ...customComm!, commission_type: newVal } }));
                                 } else {
-                                  adminInsert('reseller_product_commissions', { 
+                                  const res = await adminInsert('reseller_product_commissions', { 
                                     reseller_id: selectedReseller.id, 
                                     product_id: p.id, 
                                     commission_type: newVal, 
                                     commission_value: valueToSet 
-                                  }).then(res => {
-                                    if (res.data?.[0]) setProductCommissions(prev => ({ ...prev, [p.id]: res.data[0] }));
                                   });
+                                  if (res.error) { alert('Gagal menyimpan: ' + res.error.message); return; }
+                                  if (res.data?.[0]) setProductCommissions(prev => ({ ...prev, [p.id]: res.data[0] }));
                                 }
                               }
                             }}
@@ -481,11 +485,15 @@ export default function AdminResellersPage() {
                             style={{ padding: '6px', fontSize: '0.8rem', height: 'auto', width: '100px' }}
                             disabled={!isCustom}
                             value={isCustom ? (customComm?.commission_value || 0) : (selectedReseller.default_commission_value || 0)}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const val = parseInt(e.target.value) || 0;
                               if (customComm?.id) {
-                                adminUpdate('reseller_product_commissions', { commission_value: val }, { id: customComm.id });
                                 setProductCommissions(prev => ({ ...prev, [p.id]: { ...customComm!, commission_value: val } }));
+                                const res = await adminUpdate('reseller_product_commissions', { commission_value: val }, { id: customComm.id });
+                                if (res.error) {
+                                  alert('Gagal update nilai: ' + res.error.message);
+                                  setProductCommissions(prev => ({ ...prev, [p.id]: customComm }));
+                                }
                               }
                             }}
                           />

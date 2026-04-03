@@ -56,7 +56,7 @@ function BuyerLoginPage() {
   return (
     <div className="public-layout">
       <header className="public-header">
-        <Link href="/" className="brand">✦ Pasti Premium.id</Link>
+        <Link href="/" className="brand">✦ pastipremium.store</Link>
       </header>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>

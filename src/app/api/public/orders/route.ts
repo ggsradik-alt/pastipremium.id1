@@ -138,48 +138,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gagal membuat pesanan: ' + orderError.message }, { status: 500 });
     }
 
-    // Record commission if reseller exists
-    if (reseller && order) {
-      const { data: productCommission } = await supabase
-        .from('reseller_product_commissions')
-        .select('*')
-        .eq('reseller_id', reseller.id)
-        .eq('product_id', product.id)
-        .maybeSingle();
-
-      const commissionType = productCommission?.commission_type || reseller.default_commission_type || 'fixed';
-      const commissionRate = productCommission?.commission_value ?? (reseller.default_commission_value || 0);
-
-      let commissionAmount = 0;
-      if (commissionType === 'percentage') {
-        commissionAmount = Math.round(finalPrice * commissionRate / 100);
-      } else {
-        commissionAmount = commissionRate;
-      }
-
-      if (commissionAmount > 0) {
-        // Insert commission record
-        await supabase.from('reseller_commissions').insert({
-          reseller_id: reseller.id,
-          order_id: order.id,
-          product_id: product.id,
-          product_name: product.name,
-          order_amount: finalPrice,
-          commission_type: commissionType,
-          commission_rate: commissionRate,
-          commission_amount: commissionAmount,
-          status: 'unpaid',
-        });
-        
-        // Update reseller stats
-        await supabase.from('resellers').update({
-          total_sales: (reseller.total_sales || 0) + 1,
-          total_commission: (reseller.total_commission || 0) + commissionAmount,
-          unpaid_commission: (reseller.unpaid_commission || 0) + commissionAmount,
-          updated_at: now,
-        }).eq('id', reseller.id);
-      }
-    }
+    // NOTE: Commission is recorded in /api/webhooks/pakasir after payment is confirmed
+    // This prevents phantom commissions from unpaid/expired orders
 
     // Send Telegram Notification
     // Don't wait for it to finish (fire and forget) to speed up response

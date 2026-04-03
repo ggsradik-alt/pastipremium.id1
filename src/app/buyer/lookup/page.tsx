@@ -125,7 +125,7 @@ function BuyerLookupPage() {
   return (
     <div className="public-layout">
       <header className="public-header" style={{ justifyContent: 'space-between' }}>
-        <Link href="/" className="brand">✦ Pasti Premium.id</Link>
+        <Link href="/" className="brand">✦ pastipremium.store</Link>
         {buyer && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>👤 {buyer.name}</span>

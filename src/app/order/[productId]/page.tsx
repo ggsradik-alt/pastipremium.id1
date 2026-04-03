@@ -59,7 +59,14 @@ export default function OrderPage() {
     setError('');
 
     try {
-      const refCode = localStorage.getItem('ref_code') || '';
+      // Check if ref_code has expired (30-day TTL)
+      let refCode = localStorage.getItem('ref_code') || '';
+      const refTs = localStorage.getItem('ref_code_ts');
+      if (refCode && refTs && Date.now() - Number(refTs) > 30 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('ref_code');
+        localStorage.removeItem('ref_code_ts');
+        refCode = '';
+      }
       const res = await fetch('/api/public/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,7 +109,7 @@ export default function OrderPage() {
   return (
     <div className="public-layout">
       <header className="public-header" style={{ justifyContent: 'space-between' }}>
-        <Link href="/" className="brand">✦ Pasti Premium.id</Link>
+        <Link href="/" className="brand">✦ pastipremium.store</Link>
         {buyer && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>👤 {buyer.name}</span>
