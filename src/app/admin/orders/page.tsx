@@ -13,6 +13,7 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [syncing, setSyncing] = useState(false);
 
   // Feature 4: Search & Pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +21,28 @@ export default function OrdersPage() {
   const [dateFilter, setDateFilter] = useState('all');
 
   useEffect(() => { loadOrders(); }, []);
+
+  async function handleSyncPakasir() {
+    if (!confirm('Sync semua order pending dengan Pakasir?\n\nIni akan mengecek setiap order yang belum bayar ke Pakasir, dan mengupdate yang sudah completed.')) return;
+    setSyncing(true);
+    try {
+      const token = localStorage.getItem('admin_token') || '';
+      const res = await fetch('/api/admin/sync-pakasir', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Sync selesai!\n\n${data.message}\n\nDetail:\n${data.details?.map((d: { order_number: string; status: string }) => `• ${d.order_number}: ${d.status}`).join('\n') || '-'}`);
+        loadOrders();
+      } else {
+        alert('Error: ' + (data.error || 'Unknown'));
+      }
+    } catch {
+      alert('Terjadi kesalahan jaringan');
+    }
+    setSyncing(false);
+  }
 
   async function loadOrders() {
     const { data } = await supabase
@@ -204,8 +227,16 @@ export default function OrdersPage() {
 
   return (
     <div className="admin-content">
-      <div className="admin-topbar">
+      <div className="admin-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Pesanan</h2>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={handleSyncPakasir}
+          disabled={syncing}
+          style={{ fontSize: '0.8rem', gap: '6px', display: 'flex', alignItems: 'center' }}
+        >
+          {syncing ? <><span className="loading-spinner" style={{ width: '14px', height: '14px' }} /> Syncing...</> : '🔄 Sync Pakasir'}
+        </button>
       </div>
       <div style={{ padding: '32px' }}>
         {/* Search & Date Filter */}
