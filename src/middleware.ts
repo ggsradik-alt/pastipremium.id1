@@ -21,12 +21,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api/webhooks (bisa ditambahkan jika webhook butuh akses spesifik)
+     * - api (exclude ALL API routes - webhooks, auth, etc must not be redirected)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - sembarangan ekstensi gambar/aset lainnya
+     * - file extensions for static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
